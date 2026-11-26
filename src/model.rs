@@ -2555,6 +2555,32 @@ impl Game {
                         }
                     }
                     Ok(())
+                } else if matches!(
+                    &pending.kind,
+                    crate::pending::PendingKind::Custom { payload, .. }
+                        if payload.get("type").and_then(|v| v.as_str())
+                            == Some("after_worker_optional")
+                ) {
+                    // B017/B060/B063 optional after-worker effects: the
+                    // resolution payload confirms or declines the owner's
+                    // choice (data/bga-card-tests B017-declined,
+                    // B060-decline, B063-decline). The shared resolver in
+                    // card_events applies payment + effect on confirmation;
+                    // a decline changes nothing.
+                    let confirmed = payload
+                        .get("confirmed")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    let beneficiary = pending.player;
+                    crate::card_events::apply_after_worker_optional_decision(
+                        pending,
+                        &mut self.public.players[beneficiary],
+                        &mut self.delayed_well,
+                        &mut self.public.well_food_schedule,
+                        Some(&mut self.public.accumulations),
+                        self.public.round,
+                        confirmed,
+                    )
                 } else {
                     // Extensible: other custom effects handle their own payload
                     Ok(())

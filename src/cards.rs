@@ -6928,7 +6928,17 @@ mod verified_b_afterworker_simple_tests {
         }
     }
 
-    fn after_worker_simple(set: &CardSet, player: &mut Player, space: Space) {
+    /// Drive the after-worker dispatch and resolve the optional decision
+    /// (B017/B060/B063) with the caller's choice. The contract's
+    /// "use the card" cases accept; the declined cases pass `false`.
+    /// Returns the public accumulation map so the B017 accumulation-return
+    /// contract (space_wood_delta +2) can be asserted.
+    fn after_worker_simple_choice(
+        set: &CardSet,
+        player: &mut Player,
+        space: Space,
+        confirmed: bool,
+    ) -> BTreeMap<Space, u32> {
         let mut cards = CardState::default();
         let mut players = vec![player.clone()];
         let used_spaces = std::collections::BTreeSet::new();
@@ -6936,6 +6946,9 @@ mod verified_b_afterworker_simple_tests {
         let mut card_uses = BTreeMap::new();
         let card_use_limits = BTreeMap::new();
         let mut pending = None;
+        let mut well = BTreeMap::new();
+        let mut mirror = BTreeMap::new();
+        let mut accumulations = BTreeMap::new();
         dispatch_after_worker(
             set,
             0,
@@ -6943,20 +6956,38 @@ mod verified_b_afterworker_simple_tests {
             &mut cards,
             &mut players,
             &mut vec![],
-            &mut BTreeMap::new(),
+            &mut well,
             1,
             &used_spaces,
-            &mut BTreeMap::new(),
+            &mut accumulations,
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
-            &mut std::collections::BTreeMap::new(),
+            &mut mirror,
         )
         .unwrap();
+        if let Some(decision) = pending {
+            crate::card_events::apply_after_worker_optional_decision(
+                &decision,
+                &mut players[0],
+                &mut well,
+                &mut mirror,
+                Some(&mut accumulations),
+                1,
+                confirmed,
+            )
+            .expect("optional decision resolution applies");
+        }
         *player = players[0].clone();
+        accumulations
+    }
+
+    fn after_worker_simple(set: &CardSet, player: &mut Player, space: Space) {
+        // The accepted case: the owner chooses to use the optional effect.
+        after_worker_simple_choice(set, player, space, true);
     }
 
     // B017 森林鋤 (Forest Plow): cost 1 wood; after using Forest/Copse/Grove,
@@ -6967,10 +6998,57 @@ mod verified_b_afterworker_simple_tests {
         let mut p = Player::new(0, 0);
         p.played_cards.push("B017".into());
         p.supply.wood = 3; // 2 for effect + 1 to have some
-        after_worker_simple(&s, &mut p, Space::Forest);
+        let accums = after_worker_simple_choice(&s, &mut p, Space::Forest, true);
         assert_eq!(p.supply.wood, 1); // 3 - 2 paid
                                       // Field should be plowed
         assert!(p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })));
+        // The paid wood stays on the used accumulation space (spec
+        // `return_to: accumulation_space`; contract B017-normal
+        // space_wood_delta +2). Only the 2 paid wood returns.
+        assert_eq!(accums.get(&Space::Forest).copied(), Some(2));
+    }
+
+    // Contract data/bga-card-tests/B017.json B017-normal: setup wood 2 ->
+    // wood_delta -2, fields_delta +1, space_wood_delta +2.
+    #[test]
+    fn b017_paying_wood_returns_it_to_the_accumulation_space() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 2;
+        let accums = after_worker_simple_choice(&s, &mut p, Space::Forest, true);
+        assert_eq!(p.supply.wood, 0, "wood_delta -2");
+        let fields = p
+            .farm
+            .iter()
+            .filter(|c| matches!(c.tile, Tile::Field { .. }))
+            .count();
+        assert_eq!(fields, 1, "fields_delta +1");
+        assert_eq!(
+            accums.get(&Space::Forest).copied(),
+            Some(2),
+            "space_wood_delta +2"
+        );
+    }
+
+    // Contract B017-declined: setup wood 2, use_card false -> wood_delta 0.
+    // The owner can pay but declines: nothing is paid, plowed or accumulated.
+    #[test]
+    fn b017_declined_when_paying_is_possible() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 2;
+        let accums = after_worker_simple_choice(&s, &mut p, Space::Forest, false);
+        assert_eq!(p.supply.wood, 2, "a decline pays nothing");
+        assert!(
+            !p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })),
+            "a decline plows nothing"
+        );
+        assert!(
+            accums.get(&Space::Forest).copied().unwrap_or(0) == 0,
+            "a decline accumulates nothing"
+        );
     }
 
     #[test]
@@ -7366,6 +7444,19 @@ mod verified_b_afterworker_simple_tests {
             &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
+        if let Some(decision) = pending {
+            // B060 is optional: the accepted contract cases confirm the pay.
+            crate::card_events::apply_after_worker_optional_decision(
+                &decision,
+                &mut players[0],
+                &mut well,
+                &mut std::collections::BTreeMap::new(),
+                None,
+                5,
+                true,
+            )
+            .expect("optional decision resolution applies");
+        }
         // Food scheduled on rounds 6, 7, 8, 9, 10, 11
         for r in 6..=11 {
             assert_eq!(well.get(&r), Some(&vec![0]), "round {r} should have food");
@@ -7373,6 +7464,58 @@ mod verified_b_afterworker_simple_tests {
         assert_eq!(well.get(&12), None);
         // Grain should be spent
         assert_eq!(players[0].supply.grain, 0);
+    }
+
+    // Contract data/bga-card-tests/B060.json B060-decline: setup grain 1,
+    // pay_grain false -> rounds_with_food 0. The owner can pay but declines:
+    // nothing is paid and nothing is scheduled.
+    #[test]
+    fn b060_declined_when_paying_is_possible() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B060".into());
+        p.supply.grain = 1;
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![p];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut std::collections::BTreeMap::new(),
+        )
+        .unwrap();
+        let decision = pending.expect("an affordable owner gets the choice");
+        crate::card_events::apply_after_worker_optional_decision(
+            &decision,
+            &mut players[0],
+            &mut well,
+            &mut std::collections::BTreeMap::new(),
+            None,
+            5,
+            false, // declined
+        )
+        .expect("optional decision resolution applies");
+        assert!(well.is_empty(), "rounds_with_food 0");
+        assert_eq!(players[0].supply.grain, 1, "a decline pays nothing");
     }
 
     #[test]
@@ -7447,6 +7590,19 @@ mod verified_b_afterworker_simple_tests {
             &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
+        if let Some(decision) = pending {
+            // B060 is optional: the accepted contract cases confirm the pay.
+            crate::card_events::apply_after_worker_optional_decision(
+                &decision,
+                &mut players[0],
+                &mut well,
+                &mut std::collections::BTreeMap::new(),
+                None,
+                12,
+                true,
+            )
+            .expect("optional decision resolution applies");
+        }
         assert_eq!(well.get(&13), Some(&vec![0]));
         assert_eq!(well.get(&14), Some(&vec![0]));
         assert_eq!(well.get(&15), None);
@@ -7509,6 +7665,20 @@ mod verified_b_afterworker_simple_tests {
         after_worker_simple(&s, &mut p, Space::Lessons);
         assert_eq!(p.supply.grain, 0);
         assert_eq!(p.supply.food, 4);
+    }
+
+    // Contract data/bga-card-tests/B063.json B063-decline: setup grain 1,
+    // exchange false -> grain/food delta 0. The owner can exchange but
+    // declines: both goods stay put.
+    #[test]
+    fn b063_declined_when_exchange_is_possible() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B063".into());
+        p.supply.grain = 1;
+        after_worker_simple_choice(&s, &mut p, Space::Lessons, false);
+        assert_eq!(p.supply.grain, 1, "a decline gives no grain");
+        assert_eq!(p.supply.food, 0, "a decline receives no food");
     }
 
     #[test]

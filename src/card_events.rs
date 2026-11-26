@@ -2367,8 +2367,16 @@ fn handle_after_worker_gain_animal(
     Ok(EffectResult::Resolved)
 }
 
-/// B017 森林鋤 / B060 仕込み水: after using the trigger space, may pay cost
-/// to gain a resource or perform an action (plow field).
+/// B017 森林鋤: after using the trigger space (Forest/Copse/Grove), the owner
+/// MAY pay `amount` of `good` (2 wood) to plow `plow` field(s); the paid wood
+/// stays on the used accumulation space (spec `return_to:
+/// accumulation_space`, data/bga-card-specs/B017.json).
+///
+/// Spec `optional: true, decision_owner: owner`: paying is the owner's choice,
+/// so an affordable owner pauses the chain on a Custom PendingDecision instead
+/// of firing unconditionally. The payment, the plow and the accumulation
+/// return all happen at resolution
+/// ([`apply_after_worker_optional_decision`]); a decline changes nothing.
 fn handle_after_worker_spend_plow_field(
     ctx: &mut DispatchContext<'_>,
     space: &Space,
@@ -2378,22 +2386,35 @@ fn handle_after_worker_spend_plow_field(
     trigger: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
     if trigger.space == Some(*space) {
-        let p = &mut ctx.player;
-        // Check if player has enough resources to pay
-        if p.supply.get(*good) >= amount {
-            // Spend the resource
-            let next = p
-                .supply
-                .get(*good)
-                .checked_sub(amount)
-                .ok_or("resource underflow")?;
-            p.supply.set(*good, next);
-            // Plow the field(s)
-            for _ in 0..plow {
-                p.plow_field().map_err(|e| format!("plow failed: {e}"))?;
-            }
+        // Offer the choice only when the cost is payable; an owner who cannot
+        // pay simply gets nothing (same as a decline).
+        if ctx.player.supply.get(*good) >= amount {
+            let decision = PendingDecision::new(
+                0, // stamped by the engine
+                ctx.card_owner,
+                crate::pending::PendingKind::Custom {
+                    source_card: "B017".to_string(),
+                    // The parameters ride in the kind payload: the
+                    // phase scan overwrites `context` with its resume
+                    // bookkeeping (C147 keeps its parameters in the
+                    // kind for the same reason).
+                    payload: serde_json::json!({
+                    "type": "after_worker_optional",
+                    "card": "B017",
+                    "space": space,
+                    "action": "spend_plow_field",
+                    "cost_good": good,
+                    "cost_amount": amount,
+                    "plow": plow,
+                    // The paid wood returns to the used accumulation space.
+                    "space_return_amount": amount,
+                    }),
+                },
+                String::new(),
+                serde_json::json!({}),
+            );
+            return Ok(EffectResult::Pending(decision));
         }
-        // If player cannot pay, nothing happens (optional effect)
     }
     Ok(EffectResult::Resolved)
 }
@@ -2452,8 +2473,14 @@ fn handle_after_worker_gain_per_animal(
     Ok(EffectResult::Resolved)
 }
 
-/// B060 仕込み水: after using the trigger space, may pay grain to schedule food
-/// on the next N round spaces.
+/// B060 仕込み水: after using the trigger space (Fishing), the owner MAY pay
+/// `pay_amount` of `pay_good` (1 grain) to place 1 food on each of the next
+/// `rounds` round spaces (capped at round 14).
+///
+/// Spec `optional: true, decision_owner: owner`: an affordable owner pauses on
+/// a Custom PendingDecision; the payment and the well reservation (source of
+/// truth AND public mirror, PR #265 Finding A) happen at resolution
+/// ([`apply_after_worker_optional_decision`]). A decline changes nothing.
 fn handle_after_worker_pay_to_schedule_food(
     ctx: &mut DispatchContext<'_>,
     space: &Space,
@@ -2463,41 +2490,51 @@ fn handle_after_worker_pay_to_schedule_food(
     trigger: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
     if trigger.space == Some(*space) {
-        let p = &mut ctx.player;
-        // Check if player has enough resources to pay
-        if p.supply.get(*pay_good) >= pay_amount {
-            // Spend the resource
-            let next = p
-                .supply
-                .get(*pay_good)
-                .checked_sub(pay_amount)
-                .ok_or("resource underflow")?;
-            p.supply.set(*pay_good, next);
-            // Schedule food — PR #265 Finding A: write source of truth AND
-            // public mirror (buy_improvement pattern).
-            let current_round = ctx.round;
-            let beneficiary = ctx.beneficiary;
-            let mirror = ctx
-                .well_food_schedule
-                .as_mut()
-                .ok_or("after-worker well schedule requires the public mirror")?;
-            for i in 1..=rounds {
-                let target_round = current_round + i as u8;
-                if target_round <= 14 {
-                    ctx.delayed_well
-                        .entry(target_round)
-                        .or_default()
-                        .push(beneficiary);
-                    mirror.entry(target_round).or_default().push(beneficiary);
-                }
-            }
+        // Offer the choice only when the grain is payable; a decline and an
+        // unpayable cost are indistinguishable on the board (nothing happens).
+        if ctx.player.supply.get(*pay_good) >= pay_amount {
+            let decision = PendingDecision::new(
+                0, // stamped by the engine
+                ctx.card_owner,
+                crate::pending::PendingKind::Custom {
+                    source_card: "B060".to_string(),
+                    // The parameters ride in the kind payload: the
+                    // phase scan overwrites `context` with its resume
+                    // bookkeeping (C147 keeps its parameters in the
+                    // kind for the same reason).
+                    payload: serde_json::json!({
+                    "type": "after_worker_optional",
+                    "card": "B060",
+                    "space": space,
+                    "action": "pay_to_schedule_food",
+                    "cost_good": pay_good,
+                    "cost_amount": pay_amount,
+                    "rounds": rounds,
+                    }),
+                },
+                String::new(),
+                serde_json::json!({}),
+            );
+            return Ok(EffectResult::Pending(decision));
         }
-        // If player cannot pay, nothing happens (optional effect)
     }
     Ok(EffectResult::Resolved)
 }
 
-/// B063 味見: after using the trigger space, optionally exchange 1 grain for 4 food.
+/// B063 味見: after using the trigger space (Lessons), the owner MAY exchange
+/// `give_amount` of `give` (1 grain) for `receive_amount` of `receive`
+/// (4 food).
+///
+/// Spec `optional: true, decision_owner: owner`: an affordable owner pauses on
+/// a Custom PendingDecision; the exchange happens at resolution
+/// ([`apply_after_worker_optional_decision`]). A decline changes nothing.
+///
+/// Timing note (spec notes: "before paying the occupation cost"): the engine
+/// dispatches card effects only AFTER the core action resolves, so the
+/// exchange necessarily follows the Lessons occupation play/cost payment in
+/// this implementation. The pre-cost ordering — exchanged food paying the
+/// occupation cost — is tracked as an explicit unresolved item (AGENTS.md §3),
+/// not silently dropped.
 fn handle_after_worker_optional_exchange(
     ctx: &mut DispatchContext<'_>,
     space: &Space,
@@ -2508,27 +2545,166 @@ fn handle_after_worker_optional_exchange(
     trigger: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
     if trigger.space == Some(*space) {
-        let p = &mut ctx.player;
-        // Check if player has enough resources to give
-        if p.supply.get(*give) >= give_amount {
-            // Spend the resource
-            let next = p
-                .supply
-                .get(*give)
-                .checked_sub(give_amount)
-                .ok_or("resource underflow")?;
-            p.supply.set(*give, next);
-            // Receive the resource
-            let next = p
-                .supply
-                .get(*receive)
-                .checked_add(receive_amount)
-                .ok_or("resource overflow")?;
-            p.supply.set(*receive, next);
+        // Offer the choice only when the grain is payable; a decline and an
+        // unpayable cost are indistinguishable on the board (nothing happens).
+        if ctx.player.supply.get(*give) >= give_amount {
+            let decision = PendingDecision::new(
+                0, // stamped by the engine
+                ctx.card_owner,
+                crate::pending::PendingKind::Custom {
+                    source_card: "B063".to_string(),
+                    // The parameters ride in the kind payload: the
+                    // phase scan overwrites `context` with its resume
+                    // bookkeeping (C147 keeps its parameters in the
+                    // kind for the same reason).
+                    payload: serde_json::json!({
+                    "type": "after_worker_optional",
+                    "card": "B063",
+                    "space": space,
+                    "action": "optional_exchange",
+                    "cost_good": give,
+                    "cost_amount": give_amount,
+                    "receive_good": receive,
+                    "receive_amount": receive_amount,
+                    }),
+                },
+                String::new(),
+                serde_json::json!({}),
+            );
+            return Ok(EffectResult::Pending(decision));
         }
-        // If player cannot pay, nothing happens (optional effect)
     }
     Ok(EffectResult::Resolved)
+}
+
+/// Resolve an optional after-worker decision created by the B017/B060/B063
+/// handlers ([`handle_after_worker_spend_plow_field`],
+/// [`handle_after_worker_pay_to_schedule_food`],
+/// [`handle_after_worker_optional_exchange`]).
+///
+/// `confirmed == false` declines the optional effect: nothing is paid and
+/// nothing is gained. On confirmation the effect parameters are read from the
+/// decision context (engine-written, so a missing or unknown field is a hard
+/// error rather than a silent drop) and applied to `player`:
+/// - B017: pay the wood, plow the field(s), and return the paid wood to the
+///   used accumulation space (spec `return_to: accumulation_space`).
+/// - B060: pay the grain and reserve well food on the next N round spaces in
+///   BOTH the source of truth (`delayed_well`) and its public mirror
+///   (PR #265 Finding A), capped at round 14.
+/// - B063: exchange the goods.
+///
+/// Shared by the engine's resolution arm (`Game::apply_pending_resolution`)
+/// and the synthetic dispatch harness, so both paths apply identical behavior.
+pub fn apply_after_worker_optional_decision(
+    pending: &PendingDecision,
+    player: &mut Player,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
+    accumulations: Option<&mut BTreeMap<Space, u32>>,
+    round: u8,
+    confirmed: bool,
+) -> Result<(), String> {
+    // Parameters live in the Custom kind payload (the phase scan overwrites
+    // `context` with resume bookkeeping).
+    let crate::pending::PendingKind::Custom { payload, .. } = &pending.kind else {
+        return Err("decision is not an after-worker optional effect".into());
+    };
+    if payload.get("type").and_then(|v| v.as_str()) != Some("after_worker_optional") {
+        return Err("decision is not an after-worker optional effect".into());
+    }
+    if !confirmed {
+        // Declined: the optional effect does not fire at all.
+        return Ok(());
+    }
+    let card = payload
+        .get("card")
+        .and_then(|v| v.as_str())
+        .ok_or("after-worker optional decision missing card")?;
+    let action = payload
+        .get("action")
+        .and_then(|v| v.as_str())
+        .ok_or("after-worker optional decision missing action")?;
+    let cost_good: Good = payload
+        .get("cost_good")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .ok_or("after-worker optional decision missing cost_good")?;
+    let cost_amount = payload
+        .get("cost_amount")
+        .and_then(|v| v.as_u64())
+        .ok_or("after-worker optional decision missing cost_amount")? as u32;
+    let beneficiary = pending.player;
+    match (card, action) {
+        ("B017", "spend_plow_field") => {
+            let plow = payload.get("plow").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
+            let space_return = payload
+                .get("space_return_amount")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(u64::from(cost_amount)) as u32;
+            let space: Space = payload
+                .get("space")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .ok_or("after-worker optional decision missing space")?;
+            player.supply.pay(cost_good, cost_amount)?;
+            for _ in 0..plow {
+                player
+                    .plow_field()
+                    .map_err(|e| format!("plow failed: {e}"))?;
+            }
+            // The paid wood stays on the used accumulation space (spec
+            // `return_to: accumulation_space`); contract B017-normal asserts
+            // space_wood_delta +2.
+            if space_return > 0 {
+                let accums =
+                    accumulations.ok_or("B017 accumulation return requires the public map")?;
+                *accums.entry(space).or_insert(0) += space_return;
+            }
+            Ok(())
+        }
+        ("B060", "pay_to_schedule_food") => {
+            let rounds = payload
+                .get("rounds")
+                .and_then(|v| v.as_u64())
+                .ok_or("after-worker optional decision missing rounds")?
+                as u32;
+            player.supply.pay(cost_good, cost_amount)?;
+            for i in 1..=rounds {
+                let target_round = round + i as u8;
+                if target_round <= 14 {
+                    delayed_well
+                        .entry(target_round)
+                        .or_default()
+                        .push(beneficiary);
+                    well_food_schedule
+                        .entry(target_round)
+                        .or_default()
+                        .push(beneficiary);
+                }
+            }
+            Ok(())
+        }
+        ("B063", "optional_exchange") => {
+            let receive_good: Good = payload
+                .get("receive_good")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .ok_or("after-worker optional decision missing receive_good")?;
+            let receive_amount = payload
+                .get("receive_amount")
+                .and_then(|v| v.as_u64())
+                .ok_or("after-worker optional decision missing receive_amount")?
+                as u32;
+            player.supply.pay(cost_good, cost_amount)?;
+            let next = player
+                .supply
+                .get(receive_good)
+                .checked_add(receive_amount)
+                .ok_or("resource overflow")?;
+            player.supply.set(receive_good, next);
+            Ok(())
+        }
+        _ => Err(format!(
+            "unknown after-worker optional effect: card {card} action {action}"
+        )),
+    }
 }
 
 /// A050 (others half): each time ANY player uses the specified space,
@@ -6305,6 +6481,279 @@ mod tests {
             "each effect must fire exactly once"
         );
         assert_eq!(game.event_budget, 62, "two effects consume two budget");
+    }
+
+    /// B017 森林鋤 optional decision on the real engine path (Round 2 review
+    /// finding 3): the after-worker dispatch pauses on a Custom
+    /// PendingDecision, `resolve_pending_and_resume` applies the pay + plow +
+    /// accumulation return when confirmed, and applies nothing when declined.
+    /// The declined case is contract data/bga-card-tests/B017.json
+    /// B017-declined (wood 2 available, use_card false -> wood_delta 0).
+    ///
+    /// The game is driven through the real engine from explicit hands (the
+    /// `hands_with_*_in_seat0` pattern of tests/ch_b102_four_player_animal.rs):
+    /// round 1 gathers wood at Forest and plays B017 from hand at
+    /// MeetingPlace, round 2 uses Forest again and pauses on the optional
+    /// decision. Every state change is a logged legal action, so the
+    /// paused+resolved game also replays byte-identically.
+    #[test]
+    fn b017_optional_decision_e2e_engine_path_pause_resume() {
+        use crate::cards::card_set_for_game;
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game};
+
+        /// Explicit 7+7 hands with B017 seeded into seat 0's minor hand
+        /// (drawn from the experimental pool, which doubles as the registry /
+        /// pool acceptance check for B017 at this player count).
+        fn hands_with_b017_in_seat0() -> Vec<Vec<String>> {
+            let set = card_set_for_game(2, true);
+            assert!(set.definition("B017").is_some(), "B017 in the 2p pool");
+            let mut minors: Vec<String> = set
+                .definitions
+                .iter()
+                .filter(|c| c.kind == crate::cards::CardKind::MinorImprovement)
+                .map(|c| c.id.clone())
+                .collect();
+            let occupations: Vec<String> = set
+                .definitions
+                .iter()
+                .filter(|c| c.kind == crate::cards::CardKind::Occupation)
+                .map(|c| c.id.clone())
+                .collect();
+            assert!(
+                minors.len() >= 14,
+                "pool needs 14 minors, has {}",
+                minors.len()
+            );
+            assert!(
+                occupations.len() >= 14,
+                "pool needs 14 occupations, has {}",
+                occupations.len()
+            );
+            // B017 first in the minor pool so seat 0's first minor is B017.
+            minors.retain(|id| id != "B017");
+            let mut minor_pool = vec!["B017".to_string()];
+            minor_pool.extend(minors);
+            let mut hands: Vec<Vec<String>> = vec![Vec::new(); 2];
+            let mut cursor = 0usize;
+            for hand in hands.iter_mut() {
+                for _ in 0..7 {
+                    hand.push(minor_pool[cursor].clone());
+                    cursor += 1;
+                }
+            }
+            let mut cursor = 0usize;
+            for hand in hands.iter_mut() {
+                for _ in 0..7 {
+                    hand.push(occupations[cursor].clone());
+                    cursor += 1;
+                }
+            }
+            hands
+        }
+
+        fn fresh_game() -> Game {
+            Game::with_cards_and_hands_with_start_player(
+                Config {
+                    players: 2,
+                    seed: 0xB017,
+                    additional_action_space_enabled: false,
+                },
+                card_set_for_game(2, true),
+                hands_with_b017_in_seat0(),
+                0,
+            )
+            .expect("game setup with B017 in seat 0's hand")
+        }
+
+        /// Round 1: seat 0 gathers the Forest wood, then plays B017 from hand
+        /// at MeetingPlace (paying its printed 1 wood). Seat 1 fills its quota,
+        /// round 2 opens with Forest refilled. Round 1-3 carry no harvest, so
+        /// no feeding/breeding plans are involved.
+        fn drive_to_round_two_with_b017_played(game: &mut Game) {
+            assert_eq!(game.public.active_player, 0, "seat 0 starts");
+            game.apply(Action {
+                space: Space::Forest,
+                detail: Detail::None,
+            })
+            .expect("round 1 Forest gathers wood");
+            assert!(
+                game.public.players[0].supply.wood >= 1,
+                "at least 1 wood pays the B017 cost"
+            );
+            game.apply(Action {
+                space: Space::DayLaborer,
+                detail: Detail::None,
+            })
+            .expect("seat 1 first worker");
+            game.apply(Action {
+                space: Space::MeetingPlace,
+                detail: Detail::PlayMinor {
+                    card_id: "B017".to_string(),
+                },
+            })
+            .expect("B017 played from hand through the engine route");
+            assert!(
+                game.public.players[0]
+                    .played_cards
+                    .iter()
+                    .any(|id| id == "B017"),
+                "B017 must reach the played area"
+            );
+            game.apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .expect("seat 1 second worker closes round 1");
+            assert_eq!(game.public.round, 2, "round 2 opened");
+            assert_eq!(game.public.active_player, 0, "seat 0 starts round 2");
+        }
+
+        let confirm = serde_json::json!({ "confirmed": true });
+        let decline = serde_json::json!({ "confirmed": false });
+
+        // --- confirmed: wood paid, field plowed, wood returns to the space ---
+        let mut game = fresh_game();
+        drive_to_round_two_with_b017_played(&mut game);
+        let transition = game.apply_with_plans(
+            Action {
+                space: Space::Forest,
+                detail: Detail::None,
+            },
+            None,
+            None,
+            &crate::harvest::SimpleHarvestDetails,
+        );
+        assert!(
+            matches!(transition, Ok(Transition::Paused(_))),
+            "an affordable B017 owner must get the choice, got: {transition:?}"
+        );
+        let decision = game.pending().expect("the pause is recorded");
+        match &decision.kind {
+            crate::pending::PendingKind::Custom { source_card, .. } => {
+                assert_eq!(source_card, "B017");
+            }
+            other => panic!("unexpected pending kind: {other:?}"),
+        }
+        // The core action already ran (Forest takes the accumulated wood), so
+        // compare against the committed mid-action state, not the setup.
+        let wood_at_pause = game.public.players[0].supply.wood;
+        assert!(
+            wood_at_pause >= 2,
+            "the effect was offered: wood is payable"
+        );
+        let fields_at_pause = game.public.players[0]
+            .farm
+            .iter()
+            .filter(|c| matches!(c.tile, crate::model::Tile::Field { .. }))
+            .count();
+        let forest_acc_at_pause = game
+            .public
+            .accumulations
+            .get(&Space::Forest)
+            .copied()
+            .unwrap_or(0);
+        let outcome = game
+            .resolve_pending_and_resume(crate::pending::PendingResolution::Custom {
+                payload: confirm,
+            })
+            .expect("resolution must succeed");
+        assert_eq!(outcome, Transition::Completed, "resume must complete");
+        assert!(!game.has_pending(), "no pending after resume");
+        assert_eq!(
+            game.public.players[0].supply.wood,
+            wood_at_pause - 2,
+            "wood paid"
+        );
+        let fields_after = game.public.players[0]
+            .farm
+            .iter()
+            .filter(|c| matches!(c.tile, crate::model::Tile::Field { .. }))
+            .count();
+        assert_eq!(fields_after, fields_at_pause + 1, "one field plowed");
+        assert_eq!(
+            game.public.accumulations.get(&Space::Forest).copied(),
+            Some(forest_acc_at_pause + 2),
+            "the paid wood stays on the accumulation space"
+        );
+        assert!(game.public.used.contains(&Space::Forest), "space used");
+
+        // --- the paused+resolved game replays byte-identically ---
+        let replay = Game::replay_with_setup_and_start_player(
+            game.config.clone(),
+            (*game.card_set).clone(),
+            game.log.initial_hands.clone(),
+            game.log.initial_start_player_override,
+            &game.log.events,
+        )
+        .expect("logged actions replay");
+        assert_eq!(replay.state_hash(), game.state_hash());
+        assert_eq!(replay.integrity_hash(), game.integrity_hash());
+
+        // --- declined: nothing is paid, plowed or accumulated ---
+        let mut game = fresh_game();
+        drive_to_round_two_with_b017_played(&mut game);
+        let transition = game.apply_with_plans(
+            Action {
+                space: Space::Forest,
+                detail: Detail::None,
+            },
+            None,
+            None,
+            &crate::harvest::SimpleHarvestDetails,
+        );
+        assert!(
+            matches!(transition, Ok(Transition::Paused(_))),
+            "an affordable B017 owner must get the choice, got: {transition:?}"
+        );
+        let wood_at_pause = game.public.players[0].supply.wood;
+        assert!(
+            wood_at_pause >= 2,
+            "the effect was offered: wood is payable"
+        );
+        let forest_acc_at_pause = game
+            .public
+            .accumulations
+            .get(&Space::Forest)
+            .copied()
+            .unwrap_or(0);
+        let outcome = game
+            .resolve_pending_and_resume(crate::pending::PendingResolution::Custom {
+                payload: decline,
+            })
+            .expect("resolution must succeed");
+        assert_eq!(outcome, Transition::Completed, "resume must complete");
+        assert_eq!(
+            game.public.players[0].supply.wood, wood_at_pause,
+            "a decline pays nothing"
+        );
+        assert!(
+            !game.public.players[0]
+                .farm
+                .iter()
+                .any(|c| matches!(c.tile, crate::model::Tile::Field { .. })),
+            "a decline plows nothing"
+        );
+        assert_eq!(
+            game.public
+                .accumulations
+                .get(&Space::Forest)
+                .copied()
+                .unwrap_or(0),
+            forest_acc_at_pause,
+            "a decline accumulates nothing"
+        );
+        assert!(game.public.used.contains(&Space::Forest), "space used");
+        let replay = Game::replay_with_setup_and_start_player(
+            game.config.clone(),
+            (*game.card_set).clone(),
+            game.log.initial_hands.clone(),
+            game.log.initial_start_player_override,
+            &game.log.events,
+        )
+        .expect("logged actions replay");
+        assert_eq!(replay.state_hash(), game.state_hash());
+        assert_eq!(replay.integrity_hash(), game.integrity_hash());
     }
 
     /// P0-3 reproduction: save/load/replay after ChooseTriggerOrder pause/resume
