@@ -748,19 +748,24 @@ fn card_priority(
                                     card_good_value(*good) * i64::from(*amount) * horizon / 2
                                 }
                                 CardEffect::OnPlayGainAnimal { animal, amount, .. }
-                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
-                                    card_animal_value(*animal) * i64::from(*amount) * horizon
-                                }
+                                                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
+                                                                    card_animal_value(*animal) * i64::from(*amount) * horizon
+                                                                }
+                                                                // A002 移動耕作 / B068 マメ畑 / C017 新しい畑: a free field is
+                                                                // worth roughly one field's scoring and crop potential.
+                                                                CardEffect::OnPlayPlowField { fields, .. } => {
+                                                                    card_good_value(Good::Food) * i64::from(*fields) * horizon / 2
+                                                                }
+                                                                CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
+                                                                    card_good_value(*good) * i64::from(*amount) * horizon
+                                                                }
                                 // C006/C007 on-play effects: stone placement and choice gain
                                 // are resolved at play time; heuristic assigns neutral value.
                                 CardEffect::OnPlayChoiceGain { .. } => 0,
                                 CardEffect::OnPlayAddStoneToEmptyFields { .. } => 0,
                                 // PostPlayPassLeft is a zone move with no valuation.
                                 CardEffect::PostPlayPassLeft => 0,
-                                CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
-                                    card_good_value(*good) * i64::from(*amount) * horizon
-                                }
-                                // Chapter 1 round-start cards: complex conditional effects not evaluated by heuristic
+                                                                // Chapter 1 round-start cards: complex conditional effects not evaluated by heuristic
                                 CardEffect::StartRoundPlowFieldIfHouse { .. }
                                 | CardEffect::StartRoundCopyUnusedRoundSpace { .. }
                                 | CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. }

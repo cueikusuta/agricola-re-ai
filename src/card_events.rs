@@ -59,6 +59,10 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // phase. Its placement plan is derived and applied via place_animals
         // (the play executor cannot represent a play-time pause).
         CardEffect::OnPlayGainAnimal { .. } => TriggerPhase::Before,
+        // On-play plow fields are instantaneous play-time effects — Before
+        // phase. Placement is derived from the board via auto_plow_fields and
+        // never needs a player decision at play time.
+        CardEffect::OnPlayPlowField { .. } => TriggerPhase::Before,
         // A001/C002/E001: free (or card-priced) stable builds are
         // instantaneous at play time — Before phase.
         CardEffect::OnPlayBuildStable { .. } => TriggerPhase::Before,
@@ -585,6 +589,11 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
+                CardEffect::OnPlayPlowField {
+                    fields,
+                    adjacent,
+                    vegetable_only,
+                } => handle_on_play_plow_field(ctx, *fields, *adjacent, *vegetable_only)?,
                 CardEffect::OnPlayGainAnimal { animal, amount } => {
                     handle_on_play_gain_animal(ctx, animal, *amount)?
                 }
@@ -1252,6 +1261,7 @@ fn effect_condition_holds(
         // reports the effect triggerable.
         CardEffect::OnPlayBuildStable { .. } => true,
         CardEffect::OnPlayGainAnimal { .. } => true,
+        CardEffect::OnPlayPlowField { .. } => true,
         // B-deck on-play chapter 1: unconditional on CardPlayed; hand presence
         // and resource conditions are checked inside the handlers so the scan
         // always reports them triggerable.
@@ -1432,6 +1442,11 @@ pub fn execute_chosen_triggers(
             CardEffect::OnPlayGainAnimal { animal, amount } => {
                 handle_on_play_gain_animal(ctx, animal, *amount)?
             }
+            CardEffect::OnPlayPlowField {
+                fields,
+                adjacent,
+                vegetable_only,
+            } => handle_on_play_plow_field(ctx, *fields, *adjacent, *vegetable_only)?,
             // A001/C002/E001: free stable builds (A001: one-cell pasture
             // only); sites picked deterministically inside the handler.
             CardEffect::OnPlayBuildStable {
@@ -1910,6 +1925,7 @@ fn handle_prerequisite(
         crate::cards::CardRequirement::MinimumImprovements(min) => {
             crate::cards::improvement_count_in_front(ctx.card_set, p) >= u32::from(*min)
         }
+        crate::cards::CardRequirement::ExactFieldCount(n) => p.fields() == usize::from(*n),
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
         crate::cards::CardRequirement::PastureCount(n) => p.pastures.len() >= usize::from(*n),
         crate::cards::CardRequirement::MaximumPlayers(_) => true, // Validated at card set level
@@ -2318,6 +2334,21 @@ fn handle_on_play_gain_animal(
     let plan = auto_animal_plan(ctx.player, *animal, amount);
     crate::engine::place_animals(ctx.player, &plan, amount)
         .map_err(|e| format!("on-play animal placement failed: {e}"))?;
+    Ok(EffectResult::Resolved)
+}
+
+/// Handle on-play plow field (A002 移動耕作 / B068 マメ畑 / C017 新しい畑):
+/// plow `fields` field(s) deterministically via [`crate::engine::auto_plow_fields`].
+/// Instantaneous play-time effect — never pauses.
+fn handle_on_play_plow_field(
+    ctx: &mut DispatchContext<'_>,
+    fields: u32,
+    adjacent: bool,
+    vegetable_only: bool,
+) -> Result<EffectResult, String> {
+    let _placed = crate::engine::auto_plow_fields(ctx.player, fields, adjacent, vegetable_only)?;
+    // Budget is consumed by the caller; the placement itself is recorded by
+    // the board mutation. Returning Resolved keeps the play chain atomic.
     Ok(EffectResult::Resolved)
 }
 
@@ -10082,5 +10113,327 @@ mod a052_throwing_axe_tests {
             "owner but not actor gets nothing"
         );
         assert_eq!(players[1].supply.food, 0, "actor without card gets nothing");
+    }
+
+    // --- P0: production (dispatcher) path tests for on_play plow_field ---
+    // These drive the real play transaction
+    // `play_validate_pay` -> `card_zones::play_from_hand` -> `dispatch_play`
+    // (Phase 2 Before), the same path the engine takes for a card played from
+    // hand. The legacy `cards::play` path is kept as the control.
+
+    fn plow_card_def(
+        id: &str,
+        fields: u32,
+        adjacent: bool,
+        vegetable_only: bool,
+    ) -> CardDefinition {
+        let effects = vec![CardEffect::OnPlayPlowField {
+            fields,
+            adjacent,
+            vegetable_only,
+        }];
+        CardDefinition {
+            use_limit: None,
+            id: id.to_string(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects,
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        }
+    }
+
+    fn plow_set() -> CardSet {
+        CardSet {
+            definitions: vec![
+                plow_card_def("A002", 1, true, false),
+                plow_card_def("B068", 1, true, true),
+                plow_card_def("C017", 1, false, false),
+                CardDefinition {
+                    use_limit: None,
+                    id: "occ_test_1".to_string(),
+                    kind: CardKind::Occupation,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
+                },
+                CardDefinition {
+                    use_limit: None,
+                    id: "occ_test_2".to_string(),
+                    kind: CardKind::Occupation,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
+                },
+            ],
+        }
+    }
+
+    /// Drive one card play through the production dispatcher path and return
+    /// the resulting player state.
+    fn run_dispatcher_path(
+        set: &CardSet,
+        card_id: &str,
+        kind: CardKind,
+        fee: u32,
+        player: Player,
+        round: u8,
+    ) -> Result<Player, String> {
+        let mut cards = crate::cards::CardState {
+            hands: vec![vec![card_id.to_string()]],
+            undealt: vec![],
+        };
+        let mut players = vec![player];
+        let mut market: Vec<crate::model::Improvement> = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        {
+            let mut ctx = crate::card_zones::CardMoveCtx {
+                cards: &mut cards,
+                players: &mut players,
+                improvement_market: &mut market,
+            };
+            crate::cards::play_validate_pay(
+                set,
+                &mut ctx.cards.hands[0],
+                &mut ctx.players[0],
+                card_id,
+                kind,
+                fee,
+            )?;
+            crate::card_zones::play_from_hand(&mut ctx, 0, card_id)?;
+            dispatch_play(
+                set,
+                0,
+                card_id,
+                0,
+                ctx.cards,
+                ctx.players,
+                ctx.improvement_market,
+                &mut well,
+                round,
+                &BTreeSet::new(),
+                &mut budget,
+                &mut uses,
+                &limits,
+                &mut pending,
+                false,
+            )?;
+        }
+        Ok(players.remove(0))
+    }
+
+    #[test]
+    fn a002_engine_path_plows_one_field() {
+        let set = plow_set();
+
+        // Control: legacy cards::play path still works (pre-existing behaviour).
+        let mut legacy_hand = vec!["A002".to_string()];
+        let mut legacy = Player::new(0, 2);
+        crate::cards::play(
+            &set,
+            &mut legacy_hand,
+            &mut legacy,
+            "A002",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(legacy.fields(), 1, "legacy path must plow 1 field");
+
+        // Production dispatcher path: A002 plows exactly 1 field.
+        let player = Player::new(0, 2);
+        let player =
+            run_dispatcher_path(&set, "A002", CardKind::MinorImprovement, 0, player, 1).unwrap();
+        assert_eq!(
+            player.fields(),
+            1,
+            "dispatcher path must plow 1 field for A002"
+        );
+        assert_eq!(player.vegetable_only_fields.len(), 0);
+    }
+
+    #[test]
+    fn b068_engine_path_creates_vegetable_only_field() {
+        let set = plow_set();
+        let mut player = Player::new(0, 1);
+        player.played_cards = vec!["occ_test_1".to_string(), "occ_test_2".to_string()];
+
+        let player =
+            run_dispatcher_path(&set, "B068", CardKind::MinorImprovement, 0, player, 1).unwrap();
+        assert_eq!(
+            player.fields(),
+            1,
+            "dispatcher path must plow 1 field for B068"
+        );
+        assert_eq!(
+            player.vegetable_only_fields.len(),
+            1,
+            "B068 field must be recorded as vegetable-only"
+        );
+        let veg_cell = *player.vegetable_only_fields.iter().next().unwrap();
+
+        // Grain is rejected on the vegetable-only field...
+        let mut p = player.clone();
+        let res = crate::engine::sow(
+            &mut p,
+            &[crate::engine::Plant {
+                cell: veg_cell,
+                crop: crate::model::Crop::Grain,
+            }],
+        );
+        assert!(res.is_err(), "grain sow on vegetable-only field must fail");
+
+        // ...while vegetable is accepted.
+        let mut p = player;
+        p.supply.vegetable = 1;
+        crate::engine::sow(
+            &mut p,
+            &[crate::engine::Plant {
+                cell: veg_cell,
+                crop: crate::model::Crop::Vegetable,
+            }],
+        )
+        .unwrap();
+        assert!(
+            matches!(
+                p.farm[veg_cell].tile,
+                Tile::Field {
+                    crop: Some(Crop::Vegetable),
+                    ..
+                }
+            ),
+            "vegetable sow on vegetable-only field must succeed"
+        );
+    }
+
+    #[test]
+    fn c017_engine_path_plows_one_field_without_adjacency() {
+        let set = plow_set();
+        let mut player = Player::new(0, 0);
+        // Exactly 3 fields in advance (C017's ExactFieldCount(3) prerequisite).
+        for cell in [1usize, 2, 3] {
+            player.farm[cell].tile = Tile::Field {
+                crop: None,
+                remaining: 0,
+            };
+        }
+        assert_eq!(player.fields(), 3);
+
+        let player =
+            run_dispatcher_path(&set, "C017", CardKind::MinorImprovement, 0, player, 1).unwrap();
+        assert_eq!(
+            player.fields(),
+            4,
+            "dispatcher path must plow 1 field for C017"
+        );
+    }
+
+    #[test]
+    fn a002_engine_path_fails_when_no_empty_cell() {
+        let set = plow_set();
+        let mut player = Player::new(0, 2);
+        // Fill the farm so no plowable cell remains.
+        for cell in player.farm.iter_mut() {
+            cell.tile = Tile::Room;
+        }
+        let err = run_dispatcher_path(&set, "A002", CardKind::MinorImprovement, 0, player, 1)
+            .unwrap_err();
+        assert!(
+            err.contains("no empty cell available for plowing"),
+            "dispatcher path must fail when no cell is available: {err}"
+        );
+    }
+
+    #[test]
+    fn plow_field_effect_fires_once_per_card_via_dispatcher() {
+        // Two different plow cards played sequentially via the dispatcher:
+        // each dispatch_play must resolve its own Before-phase effect exactly
+        // once (second pass, single triggerable), never twice.
+        let set = plow_set();
+        let mut player = Player::new(0, 4);
+        player.played_cards = vec!["occ_test_1".to_string(), "occ_test_2".to_string()];
+
+        let player =
+            run_dispatcher_path(&set, "A002", CardKind::MinorImprovement, 0, player, 1).unwrap();
+        assert_eq!(player.fields(), 1, "first card must plow exactly 1 field");
+
+        let mut player = player;
+        player.supply.food = 1;
+        let player =
+            run_dispatcher_path(&set, "B068", CardKind::MinorImprovement, 0, player, 1).unwrap();
+        assert_eq!(
+            player.fields(),
+            2,
+            "second card must plow exactly 1 field (no double execution)"
+        );
+    }
+
+    #[test]
+    fn plow_field_no_double_execution_with_multiple_triggerable() {
+        // Two triggerable OnPlayPlowField effects resolved through the
+        // execute_chosen_triggers fallback (>=2 triggerable, pause not
+        // permitted): each card's effect must run exactly once and the second
+        // pass must be skipped, so total fields placed == 2 (not 4).
+        let set = CardSet {
+            definitions: vec![
+                plow_card_def("plow_a", 1, false, false),
+                plow_card_def("plow_b", 1, false, false),
+            ],
+        };
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards = vec!["plow_a".to_string(), "plow_b".to_string()];
+        let all_players = players.clone();
+        let mut ctx = DispatchContext {
+            card_set: &set,
+            player: &mut players[0],
+            cards: &mut crate::cards::CardState {
+                hands: vec![vec![]],
+                undealt: vec![],
+            },
+            improvement_market: &mut vec![],
+            delayed_well: &mut BTreeMap::new(),
+            round: 1,
+            used_spaces: &BTreeSet::new(),
+            accumulations: None,
+            animal_accumulations: None,
+            event_budget: &mut 64u32,
+            card_uses: &mut BTreeMap::new(),
+            card_use_limits: &BTreeMap::new(),
+            pending: &mut None,
+            actor: 0,
+            card_owner: 0,
+            beneficiary: 0,
+        };
+        let trigger = PhaseTriggerData {
+            space: None,
+            improvement: None,
+            baked: false,
+            previous_player: None,
+            used_spaces: BTreeSet::new(),
+            site: EventKind::CardPlayed,
+            event_kind: EventKind::CardPlayed,
+            revealed_round_cards: vec![],
+            c066_take_food_instead: false,
+        };
+        resolve_phase(
+            &mut ctx,
+            0,
+            TriggerPhase::Before,
+            &trigger,
+            &all_players,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            players[0].fields(),
+            2,
+            "each of two triggerable plow effects must execute exactly once"
+        );
     }
 }

@@ -230,6 +230,16 @@ pub struct Player {
     /// saves; defaults to None so scoring treats it as 0.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field_goods_before_final_harvest: Option<u32>,
+    /// Farm cells holding a field where only vegetables may be planted
+    /// (B068 マメ畑 / Beanfield: "this card becomes 1 field where only
+    /// vegetables can be planted"). Tracked next to the farm instead of as a
+    /// `Tile::Field` flag so every pre-B068 state serializes byte-identically:
+    /// the set is empty for them and is skipped when serializing, which keeps
+    /// the LOG_VERSION=5 `state_hash` material unchanged (the PR #327/#371
+    /// pattern). The cells still count as ordinary fields everywhere else
+    /// (`Player::fields`, scoring, harvest); only sowing is restricted.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub vegetable_only_fields: BTreeSet<usize>,
 }
 impl Player {
     pub fn new(id: usize, food: u32) -> Self {
@@ -262,6 +272,7 @@ impl Player {
             extra_housing: 0,
             begging: 0,
             field_goods_before_final_harvest: None,
+            vegetable_only_fields: BTreeSet::new(),
         }
     }
     pub fn rooms(&self) -> usize {
@@ -2724,6 +2735,15 @@ pub fn validate_player_state(
     }
     if player.occupied_stables() > 4 || player.fences.len() > 15 {
         return Err("stable/fence limit".into());
+    }
+    // B068 マメ畑 (Beanfield): every vegetable-only marker must sit on a real
+    // field tile, so a tampered save cannot make an ordinary cell vegetable-only.
+    if player
+        .vegetable_only_fields
+        .iter()
+        .any(|&i| i >= FARM_CELLS || !matches!(player.farm[i].tile, Tile::Field { .. }))
+    {
+        return Err("vegetable-only marker outside a field".into());
     }
     if work_quota[index] > player.family || workers_placed[index] > work_quota[index] {
         return Err("invalid worker count".into());

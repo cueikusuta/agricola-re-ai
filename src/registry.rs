@@ -395,6 +395,7 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
+                crate::cards::CardEffect::OnPlayPlowField { .. } => EventKind::CardPlayed,
                 // A001/C002/E001: free stable builds fire at play time.
                 crate::cards::CardEffect::OnPlayBuildStable { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
@@ -593,6 +594,7 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
                         }
+                        crate::cards::CardEffect::OnPlayPlowField { fields, .. } => *fields,
                         crate::cards::CardEffect::OnPlayBuildPasture { .. } => 1,
                         crate::cards::CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost } => {
                             *food_cost

@@ -460,6 +460,21 @@ pub enum CardEffect {
         /// The good granted (food on the printed card).
         good: Good,
     },
+    /// A002 移動耕作 (Shifting Cultivation) / B068 マメ畑 (Beanfield) /
+    /// C017 新しい畑 (Newly-Plowed Field): on play, plow `fields` field(s)
+    /// on the owner's farm. `adjacent=false` allows a field that does not
+    /// touch an existing one (C017 prints "it need not be adjacent to
+    /// another field"); `vegetable_only=true` marks the field as
+    /// vegetable-only (B068: "this card becomes 1 field where only
+    /// vegetables can be planted"). Like `OnPlayGainAnimal`, the play
+    /// executor cannot represent a play-time pause, so the placement is
+    /// derived deterministically from the board — see
+    /// [`crate::engine::auto_plow_fields`].
+    OnPlayPlowField {
+        fields: u32,
+        adjacent: bool,
+        vegetable_only: bool,
+    },
     /// A001 雨除け (Shelter) / C002 厩 (Stable) / E001 簡易納屋 (Pole Barns):
     /// on play, build up to `amount` stables, paying `wood_cost` wood per
     /// stable when non-zero (all three cards print wood_cost 0 — the stable
@@ -656,6 +671,7 @@ impl CardEffect {
             CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                 "after_worker_gain_other_accumulation_food"
             }
+            CardEffect::OnPlayPlowField { .. } => "on_play_plow_field",
             CardEffect::OnPlayBuildStable { .. } => "on_play_build_stable",
             CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => "after_worker_gain_if_owns_animal",
             CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
@@ -794,6 +810,11 @@ pub enum CardRequirement {
     MinimumPlayers(u8),
     MaximumPlayers(u8),
     MinimumImprovements(u8),
+    /// C017 新しい畑 (Newly-Plowed Field): exactly `n` field tiles on the
+    /// farm (the printed prerequisite reads "ちょうど畑タイル3" — exactly 3
+    /// field tiles, so a minimum would let the card fire one field early or
+    /// late). Field tiles only; sown and unsown both count.
+    ExactFieldCount(u8),
     /// E001 簡易納屋 (Pole Barns): at least `fences` fence segments built on
     /// the farm (2016 Lookout caps a farm at 15, so the printed card asks for
     /// all 15). Read from the player's fence set.
@@ -1050,7 +1071,8 @@ impl CardSet {
                         | CardEffect::StartRoundPlayCardIfStoneHouse { .. }
                         | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
                         | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
-                        | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 1,
+                        | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. }
+                        | CardEffect::OnPlayPlowField { .. } => 1,
                     };
                     amount == 0 || amount > 30
                 })
@@ -1572,6 +1594,7 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
             CardRequirement::MinimumImprovements(min) => {
                 improvement_count_in_front(set, player) >= u32::from(*min)
             }
+            CardRequirement::ExactFieldCount(n) => player.fields() == usize::from(*n),
             CardRequirement::MinimumFences(min) => player.fences.len() >= usize::from(*min),
             CardRequirement::MinimumPlayers(_) => true,
             CardRequirement::MaximumPlayers(_) => true,
@@ -1804,6 +1827,13 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                 PassiveRule::HousingSpace(n) => player.extra_housing += n,
             },
+            CardEffect::OnPlayPlowField {
+                fields,
+                adjacent,
+                vegetable_only,
+            } => {
+                crate::engine::auto_plow_fields(player, *fields, *adjacent, *vegetable_only)?;
+            }
             CardEffect::OnPlayAddStoneToEmptyFields { good: _, amount } => {
                 for cell in &mut player.farm {
                     if matches!(cell.tile, Tile::Field { crop: None, .. }) {
@@ -5339,6 +5369,25 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         ),
+        // C017 新しい畑 (Newly-Plowed Field): minor improvement, free, 0
+        // points, prerequisite exactly 3 field tiles; on play plow 1 field
+        // that need NOT be adjacent to another field
+        // (agricola.cloudfree.jp ?p=3072).
+        card(
+            "C017",
+            minor,
+            vec![],
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::ExactFieldCount(3),
+                },
+                CardEffect::OnPlayPlowField {
+                    fields: 1,
+                    adjacent: false,
+                    vegetable_only: false,
+                },
+            ],
+        ),
         // C006 石取り作業 (Stone Clearing): cost food1, prerequisite 1 occupation
         // played; on play place 1 stone on each empty field, harvested at next
         // field phase (fields count as cultivated until then). Pass left.
@@ -5531,7 +5580,7 @@ mod verified_band_c_tests {
     #[test]
     fn band_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["C076", "C106", "C111", "C116"] {
+        for id in ["C076", "C106", "C111", "C116", "C083", "C147", "C017"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
@@ -5897,6 +5946,133 @@ mod verified_band_c_tests {
             }]
         );
     }
+
+    #[test]
+    fn c017_requires_exactly_three_fields() {
+        let set = set();
+        let card = set.definition("C017").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, 0);
+        assert!(card.effects.iter().any(|e| matches!(
+            e,
+            CardEffect::Prerequisite {
+                rule: CardRequirement::ExactFieldCount(3)
+            }
+        )));
+    }
+
+    #[test]
+    fn c017_fails_with_less_than_three_fields() {
+        let set = set();
+        let mut hand = vec!["C017".into()];
+        let mut p = Player::new(0, 0);
+        // Only 2 fields
+        p.farm[1].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[2].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        let result = play(
+            &set,
+            &mut hand,
+            &mut p,
+            "C017",
+            CardKind::MinorImprovement,
+            0,
+        );
+        assert!(result.is_err(), "C017 should fail with <3 fields");
+    }
+
+    #[test]
+    fn c017_plows_non_adjacent_field_when_exactly_three() {
+        let set = set();
+        let mut hand = vec!["C017".into()];
+        let mut p = Player::new(0, 0);
+        // Exactly 3 fields at positions 1, 2, 3
+        p.farm[1].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[2].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[3].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "C017",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.fields(), 4, "C017 should plow 1 additional field");
+        // New field is placed at first available empty cell (position 4 is adjacent to 3)
+        // adjacent=false means adjacency is NOT REQUIRED, not that it MUST be non-adjacent
+        let new_field_pos = p
+            .farm
+            .iter()
+            .enumerate()
+            .find(|(i, c)| {
+                ![1, 2, 3].contains(i)
+                    && matches!(
+                        c.tile,
+                        Tile::Field {
+                            crop: None,
+                            remaining: 0
+                        }
+                    )
+            })
+            .map(|(i, _)| i)
+            .expect("new field should exist");
+        // First available cell is position 4 (adjacent to field at 3) - this is valid since adjacent=false
+        assert_eq!(
+            new_field_pos, 4,
+            "C017 places field at first available empty cell"
+        );
+    }
+
+    #[test]
+    fn c017_fails_with_more_than_three_fields() {
+        let set = set();
+        let mut hand = vec!["C017".into()];
+        let mut p = Player::new(0, 0);
+        // 4 fields
+        p.farm[1].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[2].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[3].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[4].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        let result = play(
+            &set,
+            &mut hand,
+            &mut p,
+            "C017",
+            CardKind::MinorImprovement,
+            0,
+        );
+        assert!(result.is_err(), "C017 should fail with >3 fields");
+    }
+
     /// Pad the verified band-C pool up to the validated deck size (7 cards
     /// of each kind per player) with inert dummy definitions so the contract
     /// cases can drive the production `Game::apply` path.
@@ -6837,6 +7013,26 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
             ],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
+        // A002 移動耕作 (Shifting Cultivation): minor improvement, 2 food, no
+        // prerequisite, 0 points; on play plow 1 field (adjacency as with the
+        // Farmland action). agricola.cloudfree.jp ?p=3423: "すぐに畑を1つ耕す。
+        // このカードはあなたの前に置かずに、あなたの左隣のプレイヤーの手札に
+        // 入れる。" The spec's post_play destination (left_neighbor_hand) has
+        // no engine counterpart in this chapter — the engine keeps played
+        // cards in the played area, so only the plow effect applies here.
+        CardDefinition {
+            use_limit: None,
+            id: "A002".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayPlowField {
+                fields: 1,
+                adjacent: true,
+                vegetable_only: false,
+            }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
     ]
 }
 
@@ -7068,6 +7264,31 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                     rooms: 5,
                     good: Good::Vegetable,
                     amount: 1,
+                },
+            ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // B068 マメ畑 (Beanfield): minor improvement, 1 food, prerequisite
+        // 2 occupations, 1 point; on play the card becomes 1 field where only
+        // vegetables can be planted (agricola.cloudfree.jp ?p=3189). Modelled
+        // as an on-play plow field with the vegetable-only marker (spec
+        // operation plow_field, params {vegetable_only, fields: 1}); the field
+        // is recorded in Player::vegetable_only_fields and sowing rejects
+        // grain on it.
+        CardDefinition {
+            use_limit: None,
+            id: "B068".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 1)],
+            points: 1,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(2),
+                },
+                CardEffect::OnPlayPlowField {
+                    fields: 1,
+                    adjacent: true,
+                    vegetable_only: true,
                 },
             ],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
@@ -7315,6 +7536,15 @@ pub fn verified_b_onplay_simple_cards() -> Vec<CardDefinition> {
 mod verified_band_b_tests {
     use super::*;
 
+    /// Combined CardSet for band B tests that need band A prerequisites (e.g., B068 needs 2 occupations from band A).
+    #[allow(dead_code)]
+    fn band_b_test_card_set() -> CardSet {
+        let mut definitions = Vec::new();
+        definitions.extend(verified_band_a_cards());
+        definitions.extend(verified_band_b_cards());
+        CardSet { definitions }
+    }
+
     fn applied(card_id: &str, spaces: &[Space], _players: usize) -> Player {
         let definitions = verified_band_b_cards();
         let mut player = Player::new(0, 0);
@@ -7486,7 +7716,7 @@ mod verified_band_b_tests {
         // A155 sits in the A-deck band pool rather than the B-deck one, but it
         // is covered here too: neither band pool may leak into the A/B
         // two-player preset.
-        for id in ["B122", "B142", "B144", "B058", "A155", "B153"] {
+        for id in ["B122", "B142", "B144", "B068", "A155", "B058", "B153"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
@@ -7494,6 +7724,142 @@ mod verified_band_b_tests {
         }
     }
 
+    #[test]
+    fn b068_creates_vegetable_only_field() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut hand = vec!["B068".into()];
+        let mut p = Player::new(0, 1); // 1 food cost + 2 occupations prereq
+                                       // Add 2 occupations to satisfy prerequisite
+        p.played_cards.push("B122".into());
+        p.played_cards.push("B142".into());
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "B068",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.fields(), 1, "B068 should create 1 field");
+        assert_eq!(
+            p.vegetable_only_fields.len(),
+            1,
+            "B068 field should be vegetable-only"
+        );
+        assert_eq!(p.supply.food, 0, "food cost paid");
+        assert_eq!(p.card_points, 1, "B068 has 1 printed point");
+    }
+
+    #[test]
+    fn b068_rejects_grain_on_vegetable_only_field() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut hand = vec!["B068".into()];
+        let mut p = Player::new(0, 1);
+        p.played_cards.push("B122".into());
+        p.played_cards.push("B142".into());
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "B068",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        // Try to sow grain on the vegetable-only field - should fail
+        let veg_field_idx = *p.vegetable_only_fields.iter().next().unwrap();
+        let result = crate::engine::sow(
+            &mut p,
+            &[crate::engine::Plant {
+                cell: veg_field_idx,
+                crop: Crop::Grain,
+            }],
+        );
+        assert!(
+            result.is_err(),
+            "grain sow on vegetable-only field should fail"
+        );
+    }
+
+    #[test]
+    fn b068_allows_vegetable_on_vegetable_only_field() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut hand = vec!["B068".into()];
+        let mut p = Player::new(0, 1);
+        p.played_cards.push("B122".into());
+        p.played_cards.push("B142".into());
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "B068",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        let veg_field_idx = *p.vegetable_only_fields.iter().next().unwrap();
+        p.supply.vegetable = 1;
+        crate::engine::sow(
+            &mut p,
+            &[crate::engine::Plant {
+                cell: veg_field_idx,
+                crop: Crop::Vegetable,
+            }],
+        )
+        .unwrap();
+        assert!(matches!(
+            p.farm[veg_field_idx].tile,
+            Tile::Field {
+                crop: Some(Crop::Vegetable),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn b068_save_resume_preserves_vegetable_only_field() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut hand = vec!["B068".into()];
+        let mut p = Player::new(0, 1);
+        p.played_cards.push("B122".into());
+        p.played_cards.push("B142".into());
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "B068",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        let veg_field_idx = *p.vegetable_only_fields.iter().next().unwrap();
+        // Serialize and deserialize
+        let json = serde_json::to_string(&p).unwrap();
+        let p2: Player = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            p2.vegetable_only_fields,
+            std::collections::BTreeSet::from([veg_field_idx])
+        );
+        assert!(matches!(
+            p2.farm[veg_field_idx].tile,
+            Tile::Field {
+                crop: None,
+                remaining: 0
+            }
+        ));
+    }
+
+    /// B058 炒り豆 (paraphrase): minor improvement costing wood 1, no
+    /// prerequisite (spec: prerequisites []).
     #[test]
     fn b058_is_minor_improvement_costing_wood_one_with_no_prerequisite() {
         let set = CardSet {
@@ -8988,7 +9354,7 @@ mod verified_band_a_tests {
     #[test]
     fn band_a_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["A099", "A101", "A106", "A117", "A140", "A155"] {
+        for id in ["A099", "A101", "A106", "A117", "A140", "A155", "A002"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
@@ -9159,6 +9525,111 @@ mod verified_band_a_tests {
         // Still fixed 1 grain + 1 vegetable
         assert_eq!(p.supply.grain, 1);
         assert_eq!(p.supply.vegetable, 1);
+    }
+
+    #[test]
+    fn a002_plows_one_field_adjacent_required() {
+        let set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        let mut hand = vec!["A002".into()];
+        let mut p = Player::new(0, 2); // 2 food for cost
+                                       // No fields yet, should plow first field (cell 1)
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "A002",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.fields(), 1, "A002 should plow 1 field");
+        // Field should be adjacent to existing (first field is always valid)
+        assert!(matches!(
+            p.farm[1].tile,
+            Tile::Field {
+                crop: None,
+                remaining: 0
+            }
+        ));
+        // Cost paid
+        assert_eq!(p.supply.food, 0);
+        // Card moved to played
+        assert_eq!(p.played_cards, vec!["A002"]);
+    }
+
+    #[test]
+    fn a002_adjacent_enforced_no_isolated_field() {
+        let set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        let mut hand = vec!["A002".into()];
+        let mut p = Player::new(0, 2);
+        // Pre-place a field at cell 5 (isolated)
+        p.farm[5].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        // Play A002 - should plow adjacent to cell 5 (cell 4 or 6)
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "A002",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.fields(), 2);
+        // New field must be adjacent to cell 5
+        let new_field_pos = p
+            .farm
+            .iter()
+            .enumerate()
+            .find(|(i, c)| {
+                *i != 5
+                    && matches!(
+                        c.tile,
+                        Tile::Field {
+                            crop: None,
+                            remaining: 0
+                        }
+                    )
+            })
+            .map(|(i, _)| i)
+            .expect("new field should exist");
+        assert!(
+            matches!(new_field_pos, 4 | 6),
+            "A002 new field must be adjacent to existing field"
+        );
+    }
+
+    #[test]
+    fn a002_fails_when_no_empty_adjacent_cell() {
+        let set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        let mut hand = vec!["A002".into()];
+        let mut p = Player::new(0, 2);
+        // Fill all cells adjacent to any possible field position
+        // Simpler: just fill all 15 farm cells with non-field content
+        for cell in &mut p.farm[1..] {
+            cell.tile = Tile::Pasture { id: 0 };
+        }
+        // Now no empty cell exists for plowing
+        let result = play(
+            &set,
+            &mut hand,
+            &mut p,
+            "A002",
+            CardKind::MinorImprovement,
+            0,
+        );
+        assert!(
+            result.is_err(),
+            "A002 should fail when no empty cell available"
+        );
     }
 }
 
