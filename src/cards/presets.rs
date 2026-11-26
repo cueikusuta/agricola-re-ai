@@ -2757,8 +2757,15 @@ mod verified_exchange_card_tests {
         play(&set, &mut hand, player, id, kind, 0)
     }
 
+    /// The LEGACY `cards::play` projection resolves exactly ONE exchange unit
+    /// for one food → one point. The name says what this test really pins: the
+    /// completed-harvest cap and the variable exchange amount are NOT visible
+    /// here (this path cannot see the dispatch round), so they stay covered by
+    /// the production dispatcher contract tests in
+    /// `tests/ch06_onplay_exchange.rs` (A036-capped at round 8, A036-normal at
+    /// round 14, round 2 cap 0 — Round 1 review P1-2).
     #[test]
-    fn a036_exchanges_food_for_points_capped_at_harvests() {
+    fn a036_legacy_projection_exchanges_one_food_for_one_point() {
         let mut player = Player::new(0, 0);
         player.supply.clay = 2; // cost
         player.supply.food = 5;

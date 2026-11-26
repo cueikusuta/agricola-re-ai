@@ -227,34 +227,54 @@ fn d009_exchanges_two_sheep_for_boar_and_cattle_and_passes_left() {
     assert!(hands[0].is_empty(), "seat 0 keeps no hand card");
 }
 
-/// D009-no-sheep: without 2 sheep the play is rejected at the prerequisite
-/// and no animal moves (the engine applies the play on a working clone, so a
-/// rejected dispatch leaves the game untouched).
-#[test]
-fn d009_without_two_sheep_is_rejected_without_state_change() {
-    let set = exchange_set();
+/// A player holding `sheep` sheep in one REAL pasture: the cells are genuine
+/// farm cells, so the holding is a real flock rather than a manufactured
+/// cell-less pasture.
+fn sheep_board(sheep: u32) -> Player {
     let mut player = Player::new(0, 0);
+    if sheep > 0 {
+        player
+            .pastures
+            .push(pasture(1, vec![0, 1], Some(Animal::Sheep), sheep));
+    }
+    player
+}
+
+/// D009-no-sheep: with fewer than the 2-sheep prerequisite the play is
+/// rejected and nothing changes. The engine applies a play on a working clone,
+/// so a rejected dispatch leaves the game untouched — pinned by full player
+/// equality, not only by animal counts.
+fn assert_d009_rejected_without_state_change(mut player: Player, case: &str) {
     let before = player.clone();
 
-    let result = dispatch_card_with_zones(&set, &mut player, "D009", 5);
+    let err = dispatch_card_with_zones(&exchange_set(), &mut player, "D009", 5)
+        .expect_err(&format!("D009 needs the 2-sheep prerequisite ({case})"));
 
-    let err = result.expect_err("D009 needs the 2-sheep prerequisite");
     assert!(
         err.contains("prerequisite"),
-        "rejection must come from the prerequisite, got: {err}"
+        "rejection must come from the prerequisite ({case}), got: {err}"
     );
+    for animal in [Animal::Sheep, Animal::Boar, Animal::Cattle] {
+        assert_eq!(
+            player.animal_count(animal),
+            before.animal_count(animal),
+            "{case}: {animal:?} count must not change"
+        );
+    }
     assert_eq!(
-        player.animal_count(Animal::Sheep),
-        before.animal_count(Animal::Sheep)
+        player, before,
+        "{case}: the whole player state must be unchanged"
     );
-    assert_eq!(
-        player.animal_count(Animal::Boar),
-        before.animal_count(Animal::Boar)
-    );
-    assert_eq!(
-        player.animal_count(Animal::Cattle),
-        before.animal_count(Animal::Cattle)
-    );
+}
+
+#[test]
+fn d009_without_two_sheep_is_rejected_without_state_change() {
+    // Case 1 — sheep 0 (the contract's `D009-no-sheep` setup): no flock.
+    assert_d009_rejected_without_state_change(sheep_board(0), "sheep=0");
+    // Case 2 — sheep 1: the price is short by exactly one sheep and that
+    // single sheep sits in a real-cell pasture, so a rejection must not
+    // consume, move or relocate it either.
+    assert_d009_rejected_without_state_change(sheep_board(1), "sheep=1");
 }
 
 /// Four sheep buy TWO exchange units (2 boar + 2 cattle), not a doubled
