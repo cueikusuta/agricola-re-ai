@@ -599,6 +599,8 @@ pub struct PublicState {
     /// Per-card use counts in the current round. Card plays are public
     /// actions, so the ledger is public state. Cleared at each round
     /// boundary; `serde(default)` keeps pre-aggregation saves loading.
+    /// Key format: "card_id:EventKind" (e.g., "TEST_LIMITED:WorkerPlaced"),
+    /// allowing per-(card, event_kind) limits within the same round period.
     #[serde(default)]
     pub card_uses: BTreeMap<String, u32>,
     /// Per-card resource accumulations on played cards. Cards that place
