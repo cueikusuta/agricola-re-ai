@@ -1,0 +1,390 @@
+{
+  "analysis_date": "2026-11-26",
+  "source_file": "data/primitive_classification.json",
+  "summary": {
+    "new_trigger": {
+      "input_types": 62,
+      "input_cards": 109,
+      "consolidated_buckets": 12,
+      "unconsolidatable_types": 18,
+      "unconsolidatable_cards": 11
+    },
+    "predicate": {
+      "input_types": 52,
+      "input_cards": 71,
+      "component_families": 11,
+      "unconsolidatable_types": 4,
+      "unconsolidatable_cards": 4
+    }
+  },
+  "existing_insertion_points": [
+    { "event_kind": "WorkerPlaced", "dispatch": "dispatch_after_worker", "phase": "After worker placement" },
+    { "event_kind": "CardPlayed", "dispatch": "dispatch_play", "phase": "Replace/Before/After card play" },
+    { "event_kind": "RoundStart", "dispatch": "dispatch_start_round", "phase": "Round beginning" },
+    { "event_kind": "Harvest", "dispatch": "dispatch_harvest_field", "phase": "Harvest field phase (pre-yield)" },
+    { "event_kind": "ClayConstruction", "dispatch": "dispatch_after_clay_construction", "phase": "Room/stone upgrade purchase" },
+    { "event_kind": "Bake", "dispatch": "dispatch_after_harvest_bake", "phase": "Baking action" },
+    { "event_kind": "AfterHarvestComplete", "dispatch": "dispatch_after_harvest_complete", "phase": "End of harvest (fields+feeding+breeding)" },
+    { "event_kind": "ImprovementPlayed", "dispatch": "dispatch_play (is_improvement_action)", "phase": "Improvement played from hand" }
+  ],
+  "new_insertion_points_needed": [
+    {
+      "event_kind": "ReturningHome",
+      "description": "Fires at returning home phase (between work phase and home phase)",
+      "trigger_types": ["returning_home_phase"],
+      "cards": ["A084", "D102", "D107"],
+      "card_count": 3
+    },
+    {
+      "event_kind": "Continuous",
+      "description": "Passive/ongoing effects evaluated at every dispatch",
+      "trigger_types": ["anytime", "any_time", "ongoing"],
+      "cards": ["B157", "C069", "E027", "E086", "D121", "D122", "D123", "D124", "D125", "D126", "D127", "D128", "D129", "D130", "D131", "D132", "D133", "D134", "D135", "D136"],
+      "card_count": 20
+    }
+  ],
+  "trigger_buckets": [
+    {
+      "bucket": 1,
+      "name": "WorkerPlaced — Action Space Use",
+      "event_kind": "WorkerPlaced",
+      "verdict": "existing_with_filters",
+      "trigger_types": ["on_action_use", "on_action_space_used"],
+      "cards": ["D147", "D150", "D151", "E129", "E130"],
+      "card_count": 5,
+      "required_filters": ["action_space_name", "action_space_used"]
+    },
+    {
+      "bucket": 2,
+      "name": "WorkerPlaced — Specific Accumulation Spaces",
+      "event_kind": "WorkerPlaced",
+      "verdict": "existing_needs_filter_component",
+      "trigger_types": ["on_use_wood_accumulation", "on_use_grain_utilization", "on_use_forest_accumulation", "on_use_day_laborer", "on_use_minor_improvement_space", "on_use_this_card"],
+      "cards": ["B015", "B026", "B028", "C138", "C140", "E081"],
+      "card_count": 6,
+      "required_filters": ["accumulation_space_type"],
+      "missing_filter_component": "accumulation_space_type: Wood|Grain|Forest|DayLaborer|MinorImprovement|ThisCard"
+    },
+    {
+      "bucket": 3,
+      "name": "CardPlayed — Occupation/Improvement Play",
+      "event_kind": "CardPlayed",
+      "verdict": "existing_with_filters",
+      "trigger_types": ["on_play_occupation", "play_minor_improvement", "when_buying"],
+      "cards": ["E051", "E091", "C027", "D117"],
+      "card_count": 4,
+      "required_filters": ["card_kind", "is_purchase"]
+    },
+    {
+      "bucket": 4,
+      "name": "CardPlayed — Build/Renovate/Fence",
+      "event_kind": "CardPlayed",
+      "verdict": "existing_needs_filter_component",
+      "trigger_types": ["after_renovation", "after_room_construction", "after_fence_build", "on_build_fence", "on_build_room_stable_fence", "on_build_room_or_play_improvement_or_renovate", "renovate"],
+      "cards": ["A045", "A120", "B055", "C146", "C149", "D111", "A111", "D094", "A083", "B030", "B027", "E123", "B168"],
+      "card_count": 16,
+      "required_filters": ["build_action_type"],
+      "missing_filter_component": "build_action_type: Renovate|Room|Stable|Fence"
+    },
+    {
+      "bucket": 5,
+      "name": "RoundStart — Round Boundary",
+      "event_kind": "RoundStart",
+      "verdict": "existing_with_filters",
+      "trigger_types": ["round_end", "first_turn_of_round", "round_1_work_phase_start", "before_sow", "before_worker_space"],
+      "cards": ["A058", "A070", "A127", "A165", "B053", "E022", "E093", "E096", "E017", "D119"],
+      "card_count": 10,
+      "required_filters": ["round_phase", "pre_action"]
+    },
+    {
+      "bucket": 6,
+      "name": "Harvest/AfterHarvestComplete — Harvest Sub-phases",
+      "event_kind": "Harvest",
+      "verdict": "existing_needs_filter_component",
+      "trigger_types": ["harvest_start", "harvest_feeding", "harvest_field", "harvest_breeding", "harvest_use_joinery", "before_harvest", "before_final_harvest", "after_final_harvest", "feeding_phase", "harvest"],
+      "cards": ["D097", "D115", "E039", "E058", "E110", "A148", "C062", "D012", "D062", "E030", "E159", "C070", "E084", "E091", "B165", "D098", "D099", "E110", "E134"],
+      "card_count": 22,
+      "required_filters": ["harvest_subphase", "pre_post"],
+      "missing_filter_component": "harvest_subphase: Start|Feeding|Field|Breeding|Final|Joinery + pre_post: Before|After"
+    },
+    {
+      "bucket": 7,
+      "name": "Bake — Baking",
+      "event_kind": "Bake",
+      "verdict": "existing_with_filters",
+      "trigger_types": ["before_bake_bread"],
+      "cards": ["A097"],
+      "card_count": 1,
+      "required_filters": ["pre_post"]
+    },
+    {
+      "bucket": 8,
+      "name": "ClayConstruction — Clay Construction",
+      "event_kind": "ClayConstruction",
+      "verdict": "existing_with_filters",
+      "trigger_types": ["after_stable_construction", "after_stable_built", "after_stables_built", "after_room_construction"],
+      "cards": ["A043", "C056", "A074", "A111", "D094"],
+      "card_count": 5,
+      "required_filters": ["construction_type"],
+      "missing_filter_component": "construction_type: Stable|Room"
+    },
+    {
+      "bucket": 9,
+      "name": "ImprovementPlayed — Improvement Play",
+      "event_kind": "ImprovementPlayed",
+      "verdict": "existing_with_filters",
+      "trigger_types": ["after_improvement", "improvement_played_from_hand"],
+      "cards": ["D118", "E031", "D117", "D118"],
+      "card_count": 4,
+      "required_filters": []
+    },
+    {
+      "bucket": 10,
+      "name": "AfterHarvestComplete — End of Harvest",
+      "event_kind": "AfterHarvestComplete",
+      "verdict": "existing_with_filters",
+      "trigger_types": ["after_final_harvest"],
+      "cards": ["D099"],
+      "card_count": 1,
+      "required_filters": []
+    },
+    {
+      "bucket": 11,
+      "name": "ReturningHomePhase — NEW Insertion Point",
+      "event_kind": "ReturningHome (NEW)",
+      "verdict": "new_insertion_point_needed",
+      "trigger_types": ["returning_home_phase"],
+      "cards": ["A084", "D102", "D107"],
+      "card_count": 3
+    },
+    {
+      "bucket": 12,
+      "name": "Continuous/Ongoing — NEW Insertion Point",
+      "event_kind": "Continuous (NEW)",
+      "verdict": "new_insertion_point_needed",
+      "trigger_types": ["anytime", "any_time", "ongoing"],
+      "cards": ["B157", "C069", "E027", "E086", "D121", "D122", "D123", "D124", "D125", "D126", "D127", "D128", "D129", "D130", "D131", "D132", "D133", "D134", "D135", "D136"],
+      "card_count": 20
+    },
+    {
+      "bucket": 13,
+      "name": "Card-Specific / Unconsolidatable",
+      "event_kind": "N/A",
+      "verdict": "card_specific",
+      "trigger_types": ["after_event", "after_occupation", "after_farmyard_space_used", "after_wood_gain", "card_clay_reaches", "check_card_becomes_room", "convert_animal_to_food", "breeding", "store_from_cumulative_space", "when_last_crop_removed_from_card", "use_family_growth", "other_player_action", "other_player_uses_grain_seeds", "pay_occupation_cost", "sow_action_declined", "stone_accumulation_space_revealed", "final_scoring", "end_game_scoring"],
+      "cards": ["B145", "E163", "A040", "B021", "E047", "C148", "E085", "E085", "E090", "B162", "E070", "E092", "B159", "E095", "B155", "A094", "D116", "B153", "E134"],
+      "card_count": 11
+    }
+  ],
+  "predicate_component_families": [
+    {
+      "family": 1,
+      "name": "Round Space State",
+      "component_name": "RoundSpaceQuery",
+      "predicate_types": ["round_space_has_marker", "round_space_has_placed_good", "round_space_in", "round_space_unused", "wood_on_this_round_space"],
+      "cards": ["A019", "A022", "A089", "B018", "B020", "D091", "E028", "A074", "A111", "A120", "B125", "E047", "A151", "B137", "A151", "B096", "B119"],
+      "type_count": 5,
+      "card_count": 17,
+      "subject": "RoundSpace",
+      "metrics": ["kind", "good", "state"],
+      "states": ["Unused", "HasMarker", "HasGood"],
+      "status": "ready"
+    },
+    {
+      "family": 2,
+      "name": "Action Space State",
+      "component_name": "ActionSpaceQuery",
+      "predicate_types": ["action_space_used", "action_space_occupied", "action_space_name", "action_space_not_accumulating"],
+      "cards": ["C126", "C131", "C131", "D147", "D151", "E130", "E129"],
+      "type_count": 4,
+      "card_count": 7,
+      "subject": "ActionSpace",
+      "metrics": ["state", "name"],
+      "states": ["Used", "Occupied", "NameMatch", "NotAccumulating"],
+      "status": "ready"
+    },
+    {
+      "family": 3,
+      "name": "Card Resource State",
+      "component_name": "CardSupplyQuery",
+      "predicate_types": ["card_food_empty", "card_clay_at_least", "card_food_at_least", "harvested_this_card_at_least"],
+      "cards": ["B021", "C148", "E027", "E072"],
+      "type_count": 4,
+      "card_count": 4,
+      "subject": "CardSupply",
+      "metrics": ["good", "harvest_count"],
+      "comparisons": ["Eq", "Ge"],
+      "status": "ready"
+    },
+    {
+      "family": 4,
+      "name": "Room/House State",
+      "component_name": "HouseQuery",
+      "predicate_types": ["rooms_at_least", "build_room_or_renovate", "renovation_to_stone_house", "room_type_is", "room_count_in", "has_empty_room", "house_has_exactly_2_rooms", "house_surrounded_by_4_fields"],
+      "cards": ["B114", "B145", "C132", "C149", "D087", "D092", "E092", "E092"],
+      "type_count": 8,
+      "card_count": 8,
+      "subject": "House",
+      "metrics": ["room_count", "room_type", "renovation_type", "empty_room", "surrounded_fields"],
+      "status": "ready"
+    },
+    {
+      "family": 5,
+      "name": "Stable/Pasture State",
+      "component_name": "FarmStructureQuery",
+      "predicate_types": ["stables_built_on_own_turn", "new_pasture_created"],
+      "cards": ["A074", "A083"],
+      "type_count": 2,
+      "card_count": 2,
+      "subject": "FarmStructure",
+      "metrics": ["build_count", "created"],
+      "attributes": ["turn: Current|Any", "min_spaces"],
+      "status": "ready"
+    },
+    {
+      "family": 6,
+      "name": "Harvest State",
+      "component_name": "HarvestQuery",
+      "predicate_types": ["harvested_from", "harvest_number", "grain_harvested_at_least"],
+      "cards": ["C070", "C124", "D113"],
+      "type_count": 3,
+      "card_count": 3,
+      "subject": "Harvest",
+      "metrics": ["source", "round_number", "grain_count"],
+      "status": "ready"
+    },
+    {
+      "family": 7,
+      "name": "Improvement State",
+      "component_name": "ImprovementQuery",
+      "predicate_types": ["improvement_played_from_hand", "improvement_is"],
+      "cards": ["D117", "D118", "E091"],
+      "type_count": 2,
+      "card_count": 3,
+      "subject": "Improvement",
+      "metrics": ["played_from_hand", "type"],
+      "status": "ready"
+    },
+    {
+      "family": 8,
+      "name": "Occupation State",
+      "component_name": "OccupationQuery",
+      "predicate_types": ["occupation_count", "occupation_count_is", "occupation_played_from_hand"],
+      "cards": ["D085", "E097", "E163"],
+      "type_count": 3,
+      "card_count": 3,
+      "subject": "Occupation",
+      "metrics": ["count", "played_from_hand"],
+      "comparisons": ["Eq", "Ge"],
+      "status": "ready"
+    },
+    {
+      "family": 9,
+      "name": "Resource/Storage State",
+      "component_name": "ResourceQuery",
+      "predicate_types": ["reed_taken_at_least", "stored_exact_wood"],
+      "cards": ["A142", "B162"],
+      "type_count": 2,
+      "card_count": 2,
+      "subject": "Resource",
+      "metrics": ["taken", "stored"],
+      "resources": ["Reed", "Wood"],
+      "comparisons": ["Ge", "Eq"],
+      "status": "ready"
+    },
+    {
+      "family": 10,
+      "name": "Round/Turn/Player State",
+      "component_name": "RoundQuery",
+      "predicate_types": ["round_is_odd", "right_neighbor_last_used", "round_number", "person_is_second_placed_this_round", "round_in_range"],
+      "cards": ["B096", "C150", "D092", "D099", "E119", "D150", "E129"],
+      "type_count": 5,
+      "card_count": 7,
+      "subject": "Round",
+      "metrics": ["number", "parity", "neighbor_action", "placement_order"],
+      "status": "ready"
+    },
+    {
+      "family": 11,
+      "name": "Player/Family/Misc",
+      "component_name": "FamilyQuery / ActorQuery / FarmSpaceQuery",
+      "predicate_types": ["other_player_uses", "family_exactly", "user_is_not_owner", "worker_on_space", "action_type", "no_unused_farm_spaces", "player_places_adjacent_field", "cultivated_fields_at_least"],
+      "cards": ["A156", "B114", "E081", "D094", "E010", "D150", "E093", "B159", "C018"],
+      "type_count": 8,
+      "card_count": 8,
+      "subject": "Player/Family/Farm",
+      "metrics": ["family_size", "actor_vs_owner", "worker_placement", "action_type", "unused_farm_spaces", "adjacent_field", "cultivated_fields"],
+      "missing_components": ["FamilyQuery", "ActorQuery", "FarmSpaceQuery"],
+      "status": "partial"
+    },
+    {
+      "family": 12,
+      "name": "Unconsolidatable",
+      "component_name": "N/A",
+      "predicate_types": ["custom", "raw_text", "space_is", "is_cumulative_space"],
+      "cards": ["B065", "D071", "B042", "C148"],
+      "type_count": 4,
+      "card_count": 4,
+      "reason": "Card-specific opaque predicates or free-text conditions",
+      "status": "unconsolidatable"
+    }
+  ],
+  "missing_filter_components_for_existing_insertion_points": [
+    {
+      "insertion_point": "WorkerPlaced",
+      "component": "accumulation_space_type",
+      "values": ["Wood", "Grain", "Forest", "DayLaborer", "MinorImprovement", "ThisCard"],
+      "affected_buckets": [2]
+    },
+    {
+      "insertion_point": "CardPlayed",
+      "component": "build_action_type",
+      "values": ["Renovate", "Room", "Stable", "Fence"],
+      "affected_buckets": [4]
+    },
+    {
+      "insertion_point": "RoundStart",
+      "component": "round_phase",
+      "values": ["End", "FirstTurn", "WorkPhaseStart"],
+      "affected_buckets": [5]
+    },
+    {
+      "insertion_point": "Harvest",
+      "component": "harvest_subphase",
+      "values": ["Start", "Feeding", "Field", "Breeding", "Final", "Joinery"],
+      "affected_buckets": [6]
+    },
+    {
+      "insertion_point": "Harvest",
+      "component": "pre_post",
+      "values": ["Before", "After"],
+      "affected_buckets": [6, 7]
+    },
+    {
+      "insertion_point": "ClayConstruction",
+      "component": "construction_type",
+      "values": ["Stable", "Room"],
+      "affected_buckets": [8]
+    }
+  ],
+  "new_predicate_components_needed": [
+    {
+      "component": "FamilyQuery",
+      "metrics": ["family_size"],
+      "comparisons": ["Eq", "Ge"],
+      "affected_predicates": ["family_exactly"]
+    },
+    {
+      "component": "ActorQuery",
+      "metrics": ["actor_vs_owner", "neighbor_action"],
+      "comparisons": ["Eq", "Ne"],
+      "affected_predicates": ["user_is_not_owner", "right_neighbor_last_used", "other_player_uses"]
+    },
+    {
+      "component": "FarmSpaceQuery",
+      "metrics": ["unused_farm_spaces", "cultivated_fields", "adjacent_field_placement"],
+      "comparisons": ["Eq", "Ge"],
+      "affected_predicates": ["no_unused_farm_spaces", "cultivated_fields_at_least", "player_places_adjacent_field"]
+    }
+  ]
+}
