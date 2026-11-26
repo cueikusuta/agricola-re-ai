@@ -1,6 +1,8 @@
-//! A068 アスパラガスの贈り物 (Asparagus Gift): after the owner uses Fencing,
-//! if the number of fences standing AFTER the action resolved is at least the
-//! current round, gain 1 vegetable.
+//! A068 アスパラガスの贈り物 (Asparagus Gift): each time the owner builds a
+//! number of fences equal to or greater than the current round, gain 1
+//! vegetable. The trigger is a fence BUILD (not a Fencing-space use), so
+//! Fencing and FarmRedevelopment fence building both fire; the count is the
+//! number of fences built by that action, not the standing fence total.
 //!
 //! Dispatcher cases mirror `data/bga-card-tests/A068.json`
 //! (A068-normal / A068-boundary / A068-not-triggered). The engine case drives
@@ -8,7 +10,7 @@
 //! action (0 -> 4), and pins save/load/replay so the grant is never doubled on
 //! replay.
 
-use agricola_re_ai::card_events::dispatch_after_worker;
+use agricola_re_ai::card_events::dispatch_after_worker_with_previous;
 use agricola_re_ai::cards::{
     can_play, verified_band_a_cards, verified_basic_card_set, CardDefinition, CardKind, CardSet,
 };
@@ -46,6 +48,7 @@ fn dispatch(
     space: Space,
     round: u8,
     players: Vec<Player>,
+    previous: Option<Player>,
 ) -> Vec<Player> {
     let mut cards = Default::default();
     let mut players = players;
@@ -61,7 +64,7 @@ fn dispatch(
     let used = BTreeSet::new();
     let accumulations = BTreeMap::new();
     let animal_accumulations = BTreeMap::new();
-    dispatch_after_worker(
+    dispatch_after_worker_with_previous(
         set,
         actor,
         space,
@@ -78,8 +81,9 @@ fn dispatch(
         &limits,
         &mut pending,
         false,
+        previous,
     )
-    .expect("dispatch_after_worker must succeed");
+    .expect("dispatch_after_worker_with_previous must succeed");
     players
 }
 
@@ -91,48 +95,126 @@ fn field_cell(tile: Tile) -> Player {
 
 #[test]
 fn a068_normal_round4_with_4_fences_grants_one_vegetable() {
-    // A068-normal: round 4, fences >= round -> vegetable +1.
+    // A068-normal: round 4, built fences == round -> vegetable +1.
     let set = set_with_a068();
     let players = vec![player_with_fences(4), Player::new(1, 0)];
-    let players = dispatch(&set, &[0], 0, Space::Fencing, 4, players);
+    let previous = Some(player_with_fences(0));
+    let players = dispatch(&set, &[0], 0, Space::Fencing, 4, players, previous);
     assert_eq!(
         players[0].supply.vegetable, 1,
-        "round 4 with 4 fences must grant 1 vegetable"
+        "round 4 with 4 fences built must grant 1 vegetable"
     );
     assert_eq!(players[1].supply.vegetable, 0, "non-owner receives nothing");
 }
 
 #[test]
-fn a068_boundary_round5_with_5_fences_grants_one_vegetable() {
-    // A068-boundary: round 5, fences == round -> vegetable +1.
+fn a068_fires_on_farm_redevelopment_fence_building() {
+    // A068 is not tied to the Fencing action space: FarmRedevelopment also
+    // builds fences (renovate + pastures), so the owner must gain the vegetable.
     let set = set_with_a068();
-    let players = vec![player_with_fences(5)];
-    let players = dispatch(&set, &[0], 0, Space::Fencing, 5, players);
+    let players = vec![player_with_fences(4), Player::new(1, 0)];
+    let previous = Some(player_with_fences(0));
+    let players = dispatch(
+        &set,
+        &[0],
+        0,
+        Space::FarmRedevelopment,
+        4,
+        players,
+        previous,
+    );
     assert_eq!(
         players[0].supply.vegetable, 1,
-        "round == fences is the printed >= boundary"
+        "FarmRedevelopment fence building must trigger A068"
+    );
+    assert_eq!(players[1].supply.vegetable, 0, "non-owner receives nothing");
+}
+
+#[test]
+fn a068_farm_redevelopment_without_fence_building_does_not_fire() {
+    // The printed trigger is building fences, not merely using the space:
+    // FarmRedevelopment with no new fences must not fire on standing fences.
+    let set = set_with_a068();
+    let players = vec![player_with_fences(4), Player::new(1, 0)];
+    let previous = Some(player_with_fences(4));
+    let players = dispatch(
+        &set,
+        &[0],
+        0,
+        Space::FarmRedevelopment,
+        4,
+        players,
+        previous,
+    );
+    assert_eq!(
+        players[0].supply.vegetable, 0,
+        "no fences were built, so A068 must not fire"
+    );
+}
+
+#[test]
+fn a068_boundary_round5_with_5_fences_grants_one_vegetable() {
+    // A068-boundary: round 5, built fences == round -> vegetable +1.
+    let set = set_with_a068();
+    let players = vec![player_with_fences(5)];
+    let previous = Some(player_with_fences(0));
+    let players = dispatch(&set, &[0], 0, Space::Fencing, 5, players, previous);
+    assert_eq!(
+        players[0].supply.vegetable, 1,
+        "round == built fences is the printed >= boundary"
     );
 }
 
 #[test]
 fn a068_not_triggered_round5_with_4_fences_grants_nothing() {
-    // A068-not-triggered: round 5, fences < round -> vegetable +0.
+    // A068-not-triggered: round 5, built fences < round -> vegetable +0.
     let set = set_with_a068();
     let players = vec![player_with_fences(4)];
-    let players = dispatch(&set, &[0], 0, Space::Fencing, 5, players);
+    let previous = Some(player_with_fences(0));
+    let players = dispatch(&set, &[0], 0, Space::Fencing, 5, players, previous);
     assert_eq!(
         players[0].supply.vegetable, 0,
-        "round > fences must not fire"
+        "round > built fences must not fire"
+    );
+}
+
+#[test]
+fn a068_counts_fences_built_this_action_not_standing_fences() {
+    // P2 interpretation pin: round 8 with 2 new fences on top of 6 standing
+    // fences must NOT fire, because only 2 fences were built this action.
+    let set = set_with_a068();
+    let players = vec![player_with_fences(8), Player::new(1, 0)];
+    let previous = Some(player_with_fences(6));
+    let players = dispatch(&set, &[0], 0, Space::Fencing, 8, players, previous);
+    assert_eq!(
+        players[0].supply.vegetable, 0,
+        "a small fence build must not fire, even when the standing total meets the round"
+    );
+}
+
+#[test]
+fn a068_existing_fences_do_not_block_a_full_round_build() {
+    // P2 counterpart: pre-existing fences never count toward the printed
+    // number, but they also do not block a build that meets the round.
+    let set = set_with_a068();
+    let players = vec![player_with_fences(6), Player::new(1, 0)];
+    let previous = Some(player_with_fences(2));
+    let players = dispatch(&set, &[0], 0, Space::Fencing, 4, players, previous);
+    assert_eq!(
+        players[0].supply.vegetable, 1,
+        "building 4 fences must fire regardless of the standing total"
     );
 }
 
 #[test]
 fn a068_does_not_fire_on_non_fencing_spaces() {
-    // Fencing is the only trigger space.
+    // The trigger is a fence build, so non-fence-building worker actions never
+    // fire A068 even when the owner already meets the round fence threshold.
     let set = set_with_a068();
     for space in [Space::Forest, Space::DayLaborer, Space::GrainSeeds] {
         let players = vec![player_with_fences(4)];
-        let players = dispatch(&set, &[0], 0, space, 4, players);
+        let previous = Some(player_with_fences(4));
+        let players = dispatch(&set, &[0], 0, space, 4, players, previous);
         assert_eq!(
             players[0].supply.vegetable, 0,
             "{space:?} must not trigger A068"
@@ -142,17 +224,18 @@ fn a068_does_not_fire_on_non_fencing_spaces() {
 
 #[test]
 fn a068_only_the_actor_owner_benefits() {
-    // Both players own A068, but only the actor's played cards are scanned.
+    // Both players own A068, but only the actor's built fences count.
     let set = set_with_a068();
     let players = vec![player_with_fences(4), player_with_fences(0)];
-    let players = dispatch(&set, &[0, 1], 1, Space::Fencing, 4, players);
+    let previous = Some(player_with_fences(0)); // actor (seat 1) built no fences
+    let players = dispatch(&set, &[0, 1], 1, Space::Fencing, 4, players, previous);
     assert_eq!(
         players[0].supply.vegetable, 0,
         "non-actor owner gets nothing"
     );
     assert_eq!(
         players[1].supply.vegetable, 0,
-        "actor without the qualifying fences gets nothing"
+        "actor without a qualifying fence build gets nothing"
     );
 }
 
@@ -275,8 +358,9 @@ fn a068_engine_post_action_fence_count_triggers_and_replays_once() {
         "playing A068 itself must not grant the vegetable"
     );
 
-    // The pre-action fence count would not meet round 3.
+    // The pre-action fence count is 0, so this action builds 4 fences.
     let pre_fences = game.public.players[0].fences.len();
+    let built_fences = 4;
     let pre_vegetable = game.public.players[0].supply.vegetable;
     assert_eq!(pre_fences, 0, "fixture must start without fences");
     apply0(
@@ -294,7 +378,11 @@ fn a068_engine_post_action_fence_count_triggers_and_replays_once() {
     assert_eq!(
         game.public.players[0].supply.vegetable,
         pre_vegetable + 1,
-        "the standing post-action fence count must trigger A068"
+        "the 4 fences built by this action must trigger A068"
+    );
+    assert_eq!(
+        built_fences, 4,
+        "the engine fixture pins the number of fences built this action"
     );
     assert_eq!(
         game.public.players[1].supply.vegetable, 0,

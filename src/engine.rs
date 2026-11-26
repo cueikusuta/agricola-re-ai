@@ -504,7 +504,7 @@ impl Game {
         }
         // Worker trigger: AfterWorkerGain and AfterWorkerGainIfUsed, in the
         // active player's played_cards order.
-        let result = crate::card_events::dispatch_after_worker(
+        let result = crate::card_events::dispatch_after_worker_with_previous(
             &self.card_set,
             player,
             action.space,
@@ -521,6 +521,7 @@ impl Game {
             &self.card_use_limits,
             &mut self.pending,
             allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
+            Some(previous.clone()),
         )?;
         if let Transition::Paused(_) = result {
             return Ok((result, Some(crate::pending::ChainStep::AfterWorker)));

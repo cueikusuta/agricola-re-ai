@@ -701,19 +701,16 @@ fn resolve_phase_scan(
                     trigger_data,
                 )?,
                 // A068 アスパラガスの贈り物: the fence-count condition needs the
-                // round and the post-action fence count, both available here.
-                CardEffect::AfterWorkerGainIfFencesAtLeastRound {
-                    space,
-                    good,
-                    amount,
-                } => handle_after_worker_gain_if_fences_at_least_round(
-                    ctx,
-                    player,
-                    space,
-                    good,
-                    *amount,
-                    trigger_data,
-                )?,
+                // round and the number of fences built by this action, both
+                // available here through the pre-action snapshot.
+                CardEffect::AfterWorkerGainIfFencesAtLeastRound { good, amount, .. } => {
+                    handle_after_worker_gain_if_fences_at_least_round(
+                        ctx,
+                        good,
+                        *amount,
+                        trigger_data,
+                    )?
+                }
                 // A052 手投げ斧: Forest/Copse/Grove use + pig_market accumulation
                 // >= min -> gain.
                 CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
@@ -1141,6 +1138,22 @@ impl<'de> Deserialize<'de> for PhaseTriggerData {
     }
 }
 
+/// A068 アスパラガスの贈り物: the printed "build a number of fences" count is
+/// the number built by THIS fence-building action, not the standing fence
+/// total. `PhaseTriggerData::previous_player` is the pre-action snapshot the
+/// post-work dispatcher threads through the engine, so the built count is a
+/// fence-set difference. Callers that cannot carry a snapshot keep the legacy
+/// standing-count fallback so direct dispatcher probes stay meaningful.
+fn a068_fence_count_reaches_round(trigger: &PhaseTriggerData, player: &Player, round: u8) -> bool {
+    match trigger.previous_player.as_ref() {
+        Some(previous) => {
+            let built = player.fences.len().saturating_sub(previous.fences.len());
+            built > 0 && usize::from(round) <= built
+        }
+        None => usize::from(round) <= player.fences.len(),
+    }
+}
+
 /// Check if an effect's trigger condition holds, without consuming budget or card uses.
 /// This is the "condition evaluation first" pass (EventTrigger integration / Issue #270).
 /// Only effects whose condition holds proceed to budget/use consumption and execution.
@@ -1291,11 +1304,13 @@ fn effect_condition_holds(
         CardEffect::AfterWorkerGainIfOwnsAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
-        // A068 アスパラガスの贈り物: the fence-count-vs-round threshold is judged
-        // in the handler (it needs the round number), so the scan gates the
-        // site and space only, mirroring the A066 pattern.
-        CardEffect::AfterWorkerGainIfFencesAtLeastRound { space, .. } => {
-            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        // A068 アスパラガスの贈り物: this is a fence-BUILD trigger, not a
+        // Fencing-space trigger. Fencing and FarmRedevelopment both build
+        // fences through worker actions, so the count reaches the handler via
+        // the pre-action fence snapshot rather than an action-space gate.
+        CardEffect::AfterWorkerGainIfFencesAtLeastRound { .. } => {
+            trigger.site == EventKind::WorkerPlaced
+                && a068_fence_count_reaches_round(trigger, player, round)
         }
         // A052 手投げ斧: the accumulation threshold needs the animal-market
         // ledger, which this scan does not carry; the handler judges the count
@@ -1571,19 +1586,11 @@ pub fn execute_chosen_triggers(
                 trigger_data,
             )?,
             // A068 アスパラガスの贈り物: the fence-count condition needs the
-            // round and the post-action fence count, both available here.
-            CardEffect::AfterWorkerGainIfFencesAtLeastRound {
-                space,
-                good,
-                amount,
-            } => handle_after_worker_gain_if_fences_at_least_round(
-                ctx,
-                player,
-                space,
-                good,
-                *amount,
-                trigger_data,
-            )?,
+            // round and the number of fences built by this action, both
+            // available here through the pre-action snapshot.
+            CardEffect::AfterWorkerGainIfFencesAtLeastRound { good, amount, .. } => {
+                handle_after_worker_gain_if_fences_at_least_round(ctx, good, *amount, trigger_data)?
+            }
             // A052 手投げ斧: Forest/Copse/Grove use + pig_market accumulation
             // >= min -> gain.
             CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
@@ -2315,23 +2322,25 @@ fn handle_after_worker_gain_if_owns_animal(
     Ok(EffectResult::Resolved)
 }
 
-/// A068 アスパラガスの贈り物 (Asparagus Gift): after the owner uses `space`
-/// (Fencing), if the fences standing AFTER the action resolved number at
-/// least the current round (`player.fences.len() >= ctx.round`,
-/// snapshot=after_event: fences built at this same Fencing action count),
-/// grant `amount` of `good` (printed: 1 vegetable) to the card owner only.
-/// `round > fences` grants nothing, and non-matching spaces or non-owner
+/// A068 アスパラガスの贈り物 (Asparagus Gift): each time the owner builds a
+/// number of fences equal to or greater than the current round, grant
+/// `amount` of `good` (printed: 1 vegetable) to the card owner only.
+/// The count is the number built by THIS fence-building action, measured from
+/// the pre-action fence snapshot in `PhaseTriggerData::previous_player`; it
+/// is neither the standing fence total nor limited to the Fencing action
+/// space (Fencing and FarmRedevelopment both build fences through worker
+/// actions). `built == 0` or `built < round` grants nothing, and non-owner
 /// players grant nothing (this handler is reached solely for the owner's own
 /// played cards).
 fn handle_after_worker_gain_if_fences_at_least_round(
     ctx: &mut DispatchContext<'_>,
-    _player: usize,
-    space: &Space,
     good: &Good,
     amount: u32,
     trigger: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
-    if trigger.space == Some(*space) && usize::from(ctx.round) <= ctx.player.fences.len() {
+    if trigger.site == EventKind::WorkerPlaced
+        && a068_fence_count_reaches_round(trigger, ctx.player, ctx.round)
+    {
         let p = &mut ctx.player;
         let next = p
             .supply
@@ -3948,6 +3957,51 @@ pub fn dispatch_after_worker(
     pending: &mut Option<PendingDecision>,
     allow_choose_trigger_order_pause: bool,
 ) -> Result<Transition, String> {
+    dispatch_after_worker_with_previous(
+        card_set,
+        player,
+        space,
+        cards,
+        players,
+        improvement_market,
+        delayed_well,
+        round,
+        used_spaces,
+        accumulations,
+        animal_accumulations,
+        event_budget,
+        card_uses,
+        card_use_limits,
+        pending,
+        allow_choose_trigger_order_pause,
+        None,
+    )
+}
+
+/// Same as [`dispatch_after_worker`] but threads the pre-action player state
+/// through `PhaseTriggerData::previous_player`. The engine needs this for
+/// effects that measure what THIS worker action changed (A068 counts the
+/// fences built by the action, not the standing fence total).
+#[allow(clippy::too_many_arguments)]
+pub fn dispatch_after_worker_with_previous(
+    card_set: &CardSet,
+    player: usize,
+    space: Space,
+    cards: &mut crate::cards::CardState,
+    players: &mut [Player],
+    improvement_market: &mut Vec<crate::model::Improvement>,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    round: u8,
+    used_spaces: &std::collections::BTreeSet<Space>,
+    accumulations: &std::collections::BTreeMap<Space, u32>,
+    animal_accumulations: &std::collections::BTreeMap<Space, u32>,
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    pending: &mut Option<PendingDecision>,
+    allow_choose_trigger_order_pause: bool,
+    previous_player: Option<Player>,
+) -> Result<Transition, String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
 
@@ -3955,7 +4009,7 @@ pub fn dispatch_after_worker(
         space: Some(space),
         improvement: None,
         baked: false,
-        previous_player: None,
+        previous_player,
         used_spaces: used_spaces.clone(),
         site: EventKind::WorkerPlaced,
         event_kind: EventKind::WorkerPlaced,

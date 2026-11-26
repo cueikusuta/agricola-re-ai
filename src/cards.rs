@@ -521,15 +521,19 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
-    /// A068 アスパラガスの贈り物 (Asparagus Gift): after the owner uses
-    /// `space` (Fencing), if the number of fences standing AFTER the action
-    /// resolved (`player.fences.len() >= round`, snapshot=after_event: fences
-    /// built at this same Fencing action count) is at least the current round
-    /// number, gain `amount` of `good` (printed: 1 vegetable). `round >
-    /// fences` does not fire. The owner-side play-time precondition ("at
-    /// least one empty field") is a separate `Prerequisite {
-    /// MinimumEmptyFields(1) }` effect, so this variant needs no new
-    /// persistent field or PendingDecision.
+    /// A068 アスパラガスの贈り物 (Asparagus Gift): each time the owner builds a
+    /// number of fences equal to or greater than the current round number,
+    /// gain `amount` of `good` (printed: 1 vegetable). "A number of fences"
+    /// is the number built by THAT fence-building action (official card text),
+    /// not the standing fence total, and it is not limited to the Fencing
+    /// action space: worker actions that build fences (Fencing,
+    /// FarmRedevelopment) fire it. `built == 0` or `built < round` does not
+    /// fire. The `space` field records the original space binding for
+    /// serialization compatibility and is no longer used as the gate; the
+    /// gate is the pre-action fence snapshot carried by the dispatcher. The
+    /// owner-side play-time precondition ("at least one empty field") is a
+    /// separate `Prerequisite { MinimumEmptyFields(1) }` effect, so this
+    /// variant needs no new persistent field or PendingDecision.
     AfterWorkerGainIfFencesAtLeastRound {
         space: Space,
         good: Good,
@@ -7079,10 +7083,12 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
         },
         // A068 アスパラガスの贈り物 (Asparagus Gift): no cost, no bonus points.
         // Play precondition: at least one empty (plowed, unplanted, stoneless)
-        // field. After the owner uses Fencing, if the fences standing after the
-        // action resolved number at least the current round, gain 1 vegetable.
-        // Snapshot is after_event: fences built at this same Fencing action
-        // count toward the threshold (spec data/bga-card-specs/A068.json).
+        // field. Each time the owner builds a number of fences equal to or
+        // greater than the current round, gain 1 vegetable. The printed
+        // number is the count built by that fence-building action (not the
+        // standing fence total), and the trigger is the fence build itself:
+        // Fencing and FarmRedevelopment fence building both fire
+        // (spec data/bga-card-specs/A068.json).
         CardDefinition {
             use_limit: None,
             id: "A068".to_owned(),

@@ -2113,7 +2113,10 @@ impl Game {
                         space: Some(completion.action.space),
                         improvement: None,
                         baked: false,
-                        previous_player: None,
+                        // A068 counts fences built by THIS action, so the
+                        // resumed post-worker trigger needs the same
+                        // pre-action snapshot the original dispatch used.
+                        previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
