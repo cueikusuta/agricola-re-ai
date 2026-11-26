@@ -169,6 +169,10 @@ pub struct Cell {
     pub tile: Tile,
     pub stable: bool,
     pub stable_animal: Option<Animal>,
+    /// Stones placed on this field (e.g. by C006 石取り作業 / Stone Clearing),
+    /// harvested at the next field phase. Meaningful only for `Tile::Field`.
+    #[serde(default)]
+    pub field_stones: u32,
 }
 impl Default for Cell {
     fn default() -> Self {
@@ -176,6 +180,7 @@ impl Default for Cell {
             tile: Tile::Empty,
             stable: false,
             stable_animal: None,
+            field_stones: 0,
         }
     }
 }
@@ -594,6 +599,8 @@ pub struct PublicState {
     /// Per-card use counts in the current round. Card plays are public
     /// actions, so the ledger is public state. Cleared at each round
     /// boundary; `serde(default)` keeps pre-aggregation saves loading.
+    /// Key format: "card_id:EventKind" (e.g., "TEST_LIMITED:WorkerPlaced"),
+    /// allowing per-(card, event_kind) limits within the same round period.
     #[serde(default)]
     pub card_uses: BTreeMap<String, u32>,
     /// Per-card resource accumulations on played cards. Cards that place
@@ -604,6 +611,49 @@ pub struct PublicState {
     /// JSON so pre-card_accumulations saves stay byte-identical (PR #327 pattern).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub card_accumulations: BTreeMap<usize, BTreeMap<String, BTreeMap<Good, u32>>>,
+}
+
+/// Cell as the LOG_VERSION=5 hash tuple serialized it (three fields).
+/// `Cell::field_stones` (C006 石取り作業, PR #363) is deliberately excluded:
+/// its serde bytes must not shift v5 `state_hash` values, so legacy fixtures
+/// keep verifying (same pattern as 332f8114 `PlayerHashMaterialV5`).
+#[derive(Serialize)]
+pub(crate) struct CellHashMaterialV5<'a> {
+    tile: &'a Tile,
+    stable: &'a bool,
+    stable_animal: &'a Option<Animal>,
+}
+
+/// Player as the LOG_VERSION=5 hash tuple serialized it, in declaration
+/// order, projecting `farm` through [`CellHashMaterialV5`]. Field additions
+/// after v5 that carry serde `default`/`skip_serializing_if` attributes
+/// (e.g. `field_goods_before_final_harvest`) are serialized here with the
+/// same attributes so hash values stay identical to the v5 byte stream.
+#[derive(Serialize)]
+pub(crate) struct PlayerHashMaterialV5<'a> {
+    id: &'a usize,
+    family: &'a u8,
+    newborns: &'a u8,
+    house: &'a House,
+    supply: &'a Supply,
+    farm: Vec<CellHashMaterialV5<'a>>,
+    pastures: &'a Vec<Pasture>,
+    pet: &'a Option<Animal>,
+    fences: &'a BTreeSet<(u8, u8)>,
+    improvements: &'a Vec<Improvement>,
+    played_cards: &'a Vec<String>,
+    card_points: &'a i32,
+    pasture_capacity_bonus: &'a u32,
+    free_fence_wood: &'a u32,
+    improvement_wood_discount: &'a u32,
+    wooden_room_cost: &'a Option<u32>,
+    room_material_cost: &'a Option<u32>,
+    major_stone_discount_by_rooms: &'a bool,
+    stone_cost_discount: &'a u32,
+    extra_housing: &'a u8,
+    begging: &'a u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    field_goods_before_final_harvest: &'a Option<u32>,
 }
 
 /// The exact `PublicState` field set the LOG_VERSION=5 `state_hash` tuple
@@ -622,7 +672,7 @@ pub(crate) struct PublicStateHashMaterialV5<'a> {
     revealed: &'a Vec<RoundCard>,
     accumulations: &'a BTreeMap<Space, u32>,
     animal_accumulations: &'a BTreeMap<Space, u32>,
-    players: &'a Vec<Player>,
+    players: Vec<PlayerHashMaterialV5<'a>>,
     improvement_market: &'a Vec<Improvement>,
     work_quota: &'a Vec<u8>,
     workers_placed: &'a Vec<u8>,
@@ -641,7 +691,42 @@ impl PublicState {
             revealed: &self.revealed,
             accumulations: &self.accumulations,
             animal_accumulations: &self.animal_accumulations,
-            players: &self.players,
+            players: self
+                .players
+                .iter()
+                .map(|p| PlayerHashMaterialV5 {
+                    id: &p.id,
+                    family: &p.family,
+                    newborns: &p.newborns,
+                    house: &p.house,
+                    supply: &p.supply,
+                    farm: p
+                        .farm
+                        .iter()
+                        .map(|c| CellHashMaterialV5 {
+                            tile: &c.tile,
+                            stable: &c.stable,
+                            stable_animal: &c.stable_animal,
+                        })
+                        .collect(),
+                    pastures: &p.pastures,
+                    pet: &p.pet,
+                    fences: &p.fences,
+                    improvements: &p.improvements,
+                    played_cards: &p.played_cards,
+                    card_points: &p.card_points,
+                    pasture_capacity_bonus: &p.pasture_capacity_bonus,
+                    free_fence_wood: &p.free_fence_wood,
+                    improvement_wood_discount: &p.improvement_wood_discount,
+                    wooden_room_cost: &p.wooden_room_cost,
+                    room_material_cost: &p.room_material_cost,
+                    major_stone_discount_by_rooms: &p.major_stone_discount_by_rooms,
+                    stone_cost_discount: &p.stone_cost_discount,
+                    extra_housing: &p.extra_housing,
+                    begging: &p.begging,
+                    field_goods_before_final_harvest: &p.field_goods_before_final_harvest,
+                })
+                .collect(),
             improvement_market: &self.improvement_market,
             work_quota: &self.work_quota,
             workers_placed: &self.workers_placed,
@@ -1762,6 +1847,7 @@ impl Game {
                             round,
                             used_spaces: &used_spaces,
                             accumulations: None,
+                            animal_accumulations: None,
                             event_budget: &mut event_budget,
                             card_uses: &mut card_uses,
                             card_use_limits: &card_use_limits,
@@ -1898,6 +1984,7 @@ impl Game {
                         delayed_well: &mut delayed_well,
                         round,
                         accumulations: None,
+                        animal_accumulations: None,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
                         card_uses: &mut card_uses,
@@ -2008,7 +2095,12 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
-                        accumulations: None,
+                        // A140 ショベル運搬人 reads the OTHER clay accumulation
+                        // at resolution time; the paused state already reflects
+                        // the core action's take, so the current public map is
+                        // exactly what the original dispatch saw.
+                        accumulations: Some(&next.public.accumulations),
+                        animal_accumulations: Some(&next.public.animal_accumulations),
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -2023,7 +2115,10 @@ impl Game {
                         space: Some(completion.action.space),
                         improvement: None,
                         baked: false,
-                        previous_player: None,
+                        // A068 counts fences built by THIS action, so the
+                        // resumed post-worker trigger needs the same
+                        // pre-action snapshot the original dispatch used.
+                        previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
@@ -2361,7 +2456,12 @@ impl Game {
                     delayed_well: &mut self.delayed_well,
                     round: self.public.round,
                     used_spaces: &self.public.used,
-                    accumulations: None,
+                    // A140 ショベル運搬人 reads the OTHER clay accumulation
+                    // at resolution time; the paused state was committed after
+                    // the core action's take, so the current public map holds
+                    // exactly the amounts the original scan saw.
+                    accumulations: Some(&self.public.accumulations),
+                    animal_accumulations: Some(&self.public.animal_accumulations),
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,

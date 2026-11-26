@@ -113,7 +113,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
-    "notes": "Gain 2 food on play; after each unconditional Sow get 1 food per stable."
+    "implementation_status": "in_progress",
+    "notes": "Gain 2 food on play; after each unconditional Sow get 1 food per stable. Chapter 1 (restack 2026-11-23): the on-play 2-food gain is implemented with the existing OnPlayGain variant; the after_sow per-stable half awaits its trigger chapter."
   }
 }
