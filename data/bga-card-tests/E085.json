@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "card_id": "E085",
+  "cases": [
+    {
+      "id": "E085-normal",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 2,
+        "food_on_card": 0
+      },
+      "action": {
+        "play": "E085",
+        "convert_boar_to_food": 1
+      },
+      "expected": {
+        "food_on_card": 1,
+        "is_room": false
+      }
+    },
+    {
+      "id": "E085-becomes-room",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 2,
+        "food_on_card": 1
+      },
+      "action": {
+        "convert_cattle_to_food": 1
+      },
+      "expected": {
+        "food_on_card": 2,
+        "is_room": true
+      }
+    },
+    {
+      "id": "E085-boar-only",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 3,
+        "food_on_card": 0
+      },
+      "action": {
+        "convert_boar_to_food": 2
+      },
+      "expected": {
+        "food_on_card": 2,
+        "is_room": false
+      }
+    },
+    {
+      "id": "E085-cattle-only",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 1,
+        "food_on_card": 0
+      },
+      "action": {
+        "convert_cattle_to_food": 1
+      },
+      "expected": {
+        "food_on_card": 1,
+        "is_room": true
+      }
+    }
+  ]
+}

@@ -85,6 +85,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Each fence build with fences >= current round: gain 1 vegetable."
+    "notes": "Each fence-building action where the number of fences built by that action is equal to or greater than the current round: gain 1 vegetable. The printed number is the count built by the triggering action, not the standing fence total; the trigger is the fence build itself, so Fencing and FarmRedevelopment fence building both fire."
   }
 }

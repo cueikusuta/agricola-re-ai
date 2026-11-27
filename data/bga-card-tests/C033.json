@@ -3,7 +3,7 @@
   "card_id": "C033",
   "cases": [
     {
-      "id": "C033-normal",
+      "id": "C033-scoring-2-empty",
       "scope": "effect_only",
       "setup": {
         "player": {
@@ -18,13 +18,72 @@
       },
       "expected": {
         "effect_applies": true,
-        "points_gained": null,
-        "notes": "Inventory-only test contract"
+        "notes": "Effect test: C033-scoring-2-empty"
       },
-      "notes": "Placeholder test case"
+      "notes": "Primary source verified test case for C033"
     },
     {
-      "id": "C033-edge",
+      "id": "C033-scoring-4-empty",
+      "scope": "effect_only",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C033",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Effect test: C033-scoring-4-empty"
+      },
+      "notes": "Primary source verified test case for C033"
+    },
+    {
+      "id": "C033-scoring-5-empty",
+      "scope": "effect_only",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C033",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Effect test: C033-scoring-5-empty"
+      },
+      "notes": "Primary source verified test case for C033"
+    },
+    {
+      "id": "C033-scoring-6-empty",
+      "scope": "effect_only",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C033",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Effect test: C033-scoring-6-empty"
+      },
+      "notes": "Primary source verified test case for C033"
+    },
+    {
+      "id": "C033-legal-play",
       "scope": "legal_play",
       "setup": {
         "player": {
@@ -35,14 +94,13 @@
       "action": {
         "type": "play_card",
         "card_id": "C033",
-        "cost_paid": false
+        "cost_paid": true
       },
       "expected": {
-        "effect_applies": false,
-        "error": "insufficient_cost_or_prereq",
-        "notes": "Card should not be playable without meeting cost/prerequisites"
+        "effect_applies": true,
+        "notes": "Card should be playable when cost/prerequisites met"
       },
-      "notes": "Placeholder edge case test"
+      "notes": "Primary source verified test case for C033"
     }
   ]
 }

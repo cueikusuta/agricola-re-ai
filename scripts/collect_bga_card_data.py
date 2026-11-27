@@ -38,7 +38,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LEDGER = ROOT / "docs" / "card-catalog-ae-preliminary.csv"
-RUST_CARDS = ROOT / "src" / "cards.rs"
+RUST_CARDS = ROOT / "src" / "cards"
 LIST_JA = "https://agricola.cloudfree.jp/cardlist/"
 LIST_EN = "https://agricola.cloudfree.jp/cardlist_en/"
 UNIMPLEMENTED = "https://agricola.cloudfree.jp/unimplemented/"
@@ -318,7 +318,12 @@ def build(args: argparse.Namespace) -> tuple[list[dict[str, str]], dict[str, str
         raise SystemExit("existing ledger is not 840 unique ids")
     # Cross-check: which ids already have a Rust card definition?  This is the
     # engine's implementation status, not official verification.
-    implemented = set(re.findall(r'"([A-E]\d{3})"', RUST_CARDS.read_text(encoding="utf-8")))
+    rust_card_files = sorted(RUST_CARDS.rglob("*.rs")) if RUST_CARDS.is_dir() else [RUST_CARDS]
+    implemented = {
+        card_id
+        for path in rust_card_files
+        for card_id in re.findall(r'"([A-E]\d{3})"', path.read_text(encoding="utf-8"))
+    }
 
     by_id: dict[str, dict[str, str]] = {}
     for ja_row, en_row in zip(ja_rows, en_rows):

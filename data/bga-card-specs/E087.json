@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "card_id": "E087",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "改築名人",
+    "name_en": "Master Renovator"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2666",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "end_of_work_phase",
+      "conditions": [
+        {
+          "predicate": "round_is",
+          "params": {
+            "round": 7
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "renovate",
+          "target": "board",
+          "params": {
+            "free_person": true,
+            "discount_one_building_resource": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_trigger",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    },
+    {
+      "trigger": "end_of_work_phase",
+      "conditions": [
+        {
+          "predicate": "round_is",
+          "params": {
+            "round": 9
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "renovate",
+          "target": "board",
+          "params": {
+            "free_person": true,
+            "discount_one_building_resource": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_trigger",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E087-round7",
+      "E087-round9",
+      "E087-both"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "At end of work phase in rounds 7 and 9, may renovate without placing a person; one building resource cheaper. Stays in played area."
+  }
+}

@@ -10,14 +10,8 @@
 8. テストを各PRに添え、Cargo fmt/clippy/testと固定シード再現をゲートにする。通常PRの軽量CIは60秒以内を目標（ホスト変動は絶対保証しない）。長時間の1,000試合評価・Playwright完走・学習は別ジョブで実施する。**大量シミュレーション・自己対戦・AI比較は原則GitHub ActionsのGitHub-hosted標準CPUランナーで実行**し、ローカルは小規模デバッグ用とする。
 9. ライセンスファイルは作成しない。
 
-10. **M7以降の開発**：M8のルール正確性・詳細合法行動API・評価基盤を先行し、M9日本語UI、M10 4人カード、M11ドラフト、M12〜M15 AI実験を段階的に進める。マイルストーン番号とIssue対応はロードマップを読む。
-11. **AIの評価**：首位率+5パーセントポイントを暫定目標、1手思考上限10秒、初期1,000試合（95%区間・必要数の再計算）。最終優先順位は首位率→期待順位→得点差→計算コスト。得点差を学習報酬として使う場合も首位率で最終検証する。未公開手札、未来カード、内部seedをAIへ渡さない。
-12. **自己レビュー**：処理のまとまり、関数、コミットの各単位で自己レビューして問題を修正する。公式ルール疑義はIssueへ分離し、確認前に実装しない。1 Issue=1目的=1ブランチ=1PR。**M14のG0〜G3ゲート未達なら大規模学習に進まない**。
-13. **GitHub Actions大量試合運用**：通常PRの必須CIは小規模テストだけを実行し60秒以内を目標に維持する。ゲームエンジン・評価・証拠生成に関係する変更が`main`へ統合された場合、`Mode-wide Simulator Verification`（2/3/4人×追加タイルOFF/ON×各1,000試合）と`G0 gate`（証拠・1,000エピソード・各arm 1,000試合）を**関連ファイルのpushイベントで別ワークフロー自動起動**し、同一実行SHA・Artifact・fail-closedのpass/hold/failを記録する。単なるdocs/UI変更や通常PRで大量ジョブを走らせない。両ワークフローの`workflow_dispatch`も維持して条件を明示できるようにする。**AI直接対戦・大量学習などの計算量が変化する実験はmain pushごとに自動起動せず**、ゲート・試合数・seed・時間/CPU予算を確認し、必要なActions実行権限を持つAIエージェントまたは管理者が`gh workflow run`等で明示起動する。標準GitHub-hosted CPUを使用し、有料GPU/大型ランナーは明示判断なしに使わない。ArtifactとRun URLを後で検証し、CIの緑色だけで実験の強さ/公式照合を認定しない。
-
-14. **独立レビューと再レビュー**：ゲームルール・状態遷移・カード効果・公開/非公開情報・保存復元・AI評価・基盤設計などに関わる重要PRは、実装担当とは別セッションによる初回独立レビューを原則必須とする。単純な文書修正など低リスク変更を除外する場合は根拠をPRに記録する。自己レビューやCIだけでは初回独立レビューを代替しない。レビュー担当は仕様・公式典拠・実際の到達可能性を実装担当とは独立に確認し、PR・レビュー時HEAD・指摘と判定を記録する。
-15. **指摘修正後の扱い**：実装担当は各指摘の対応・保留理由をPRに記録し、処理のまとまり・関数・コミットごとに自己レビューする。再現できる不具合には原則回帰テストを追加し、固定seedの再現性と必要なCIを最新HEADで確認する。P0/P1の重大指摘修正、設計/広域ロジック変更、ゲームルール・非公開情報・保存データ・状態整合性・再演ハッシュに影響する修正は**修正差分の独立再レビュー必須**。局所的な低リスクP2/P3修正は自己レビュー・必要なテストとCI・対応記録で完了でき、再独立レビューは不要。指摘のP0〜P3は**重大度**を示し、開発工程番号とは区別する。
-16. **レビュー終了条件**：初回独立レビュー（必要な場合）と高リスク差分の独立再レビュー、必須指摘への対応、最新HEADの必要なCI/テスト成功、未解決の重大問題なしを確認したらマージ可能とする。レビュー→修正は原則1サイクルとし、新たな重大指摘が発生した場合のみ追加確認する。既存のブランチ保護・承認失効・CIゲートは迂回しない。
+10. **M7以降の開発・AI評価・自己レビュー・GitHub Actions大量試合運用（旧第10〜13項）**：詳細は [`docs/agents/ai-experiments.md`](docs/agents/ai-experiments.md) を参照。
+14. **独立レビュー・指摘修正・レビュー終了条件（旧第14〜16項）**：詳細は [`docs/agents/reviewer.md`](docs/agents/reviewer.md) を参照。
 17. **自動実行時の確認省略範囲**：ユーザーが当該タスクで `auto` 等の自動実行を指示した場合、次の操作は対象タスク（1 Issue=1目的=1ブランチ=1PR）の範囲内で**チャットでの都度確認を省いて進めてよい**。ただし、この文書だけでアプリ・サンドボックス・GitHubの権限や承認が付与されるわけではない。
     - **シェルの初期カレントディレクトリはこのリポジトリ直下**（`PWD` = リポジトリ）。コマンドの頭に `cd <絶対パス> &&` を付けない（不要な上、コマンドごとの承認要求につながる）。そのまま実行し、別ディレクトリは `--manifest-path` など引数で指定する。
     - ローカル検証: `cargo fmt` / `cargo clippy` / `cargo test`、`node --check`、feature ブランチでの `git add` / `git commit`。
@@ -27,4 +21,10 @@
     - アプリ・サンドボックス・GitHubが承認を要求した場合は正規の承認フローに従う。本項を理由に要求を無視しない。承認が拒否された場合は回避・迂回せず、その事実と理由をPRまたは最終報告に記録して独立して実行可能な作業へ進む。
     - 引き続き禁止: `main` への直接コミット、force push、`git reset --hard`、`git clean -fd`、他セッションの作業ブランチの変更・上書き、外部サービスへの無断送信、秘密情報の読み出し・掲載。
 
-18. **PR検証のActions逃がし（2026-11-17）**：PR作成時の検証はGitHub Actionsを主体とし、ローカル実行は対象を絞る。ワーカーは `cargo fmt --check` / `cargo clippy --all-targets --all-features --locked -- -D warnings` と、自分が追加・変更したテスト（`cargo test --lib <カードID または 変更モジュール>`）のみをローカルで実行する。プール数・MCTSダイジェストを動かした場合に限り `cargo test --test m6_verified_pool` と `cargo test --lib mcts::tests::sample_game_distribution_digest_is_stable` を追加で実行する。**`cargo test --locked` の全件実行はローカルの必須手順としない** — `ci.yml` の `cargo test` ジョブ（nextest `--release --locked --all-targets`）が全PRで全件を実行し、`pipeline-gates.yml` が仕様・台帳・ブロッカーのPythonゲート3本を全PRで実行する。PR本文のゲート欄にはローカル測定値ではなく**Actionsのチェック名・結論・run URL**を記録する。レビューとマージの判断も同じくActionsのチェック状態（review対象HEAD SHAの check-runs）を根拠とし、レビュー時のローカル全件再実行は行わない。Actionsが赤い場合は失敗ジョブのログをrun URLから読んで原因を直し、pushする。詳細は `docs/ci-performance.md` の「PR検証のActions逃がし」節。`Mode-wide Simulator Verification` / `G0 gate` などmain統合時の大量検証の扱いは第13項のまま変更しない。
+18. **PR検証のActions逃がし（2026-11-17）**：PR作成時の検証はGitHub Actionsを主体とし、ローカル実行は対象を絞る。ワーカーは `cargo fmt --check` / `cargo clippy --all-targets --all-features --locked -- -D warnings` と、自分が追加・変更したテスト（`cargo test --lib <カードID または 変更モジュール>`）のみをローカルで実行する。プール数・MCTSダイジェストを動かした場合に限り `cargo test --test m6_verified_pool` と `cargo test --lib mcts::tests::sample_game_distribution_digest_is_stable` を追加で実行する。**`cargo test --locked` の全件実行はローカルの必須手順としない** — `ci.yml` の `cargo test` ジョブ（nextest `--release --locked --all-targets`）が全PRで全件を実行し、`pipeline-gates.yml` が仕様・台帳・ブロッカーのPythonゲート3本を全PRで実行する。PR本文のゲート欄にはローカル測定値ではなく**Actionsのチェック名・結論・run URL**を記録する。レビューとマージの判断も同じくActionsのチェック状態（review対象HEAD SHAの check-runs）を根拠とし、レビュー時のローカル全件再実行は行わない。Actionsが赤い場合は失敗ジョブのログをrun URLから読んで原因を直し、pushする。詳細は `docs/ci-performance.md` の「PR検証のActions逃がし」節。`Mode-wide Simulator Verification` / `G0 gate` などmain統合時の大量検証の扱いは第13項（[`docs/agents/ai-experiments.md`](docs/agents/ai-experiments.md)）のまま変更しない。
+
+## 役割別規約
+
+- AI実験・大量試合運用（第10〜13項）：[`docs/agents/ai-experiments.md`](docs/agents/ai-experiments.md)
+- 独立レビュー・再レビュー（第14〜16項）：[`docs/agents/reviewer.md`](docs/agents/reviewer.md)
+- レーンBカード量産ワーカー最小規則：[`docs/agents/card-worker.md`](docs/agents/card-worker.md)
