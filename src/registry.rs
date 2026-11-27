@@ -420,6 +420,9 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                     EventKind::WorkerPlaced
                 }
+                crate::cards::CardEffect::AfterWorkerOptionalBundleGain { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => {
                     EventKind::WorkerPlaced
                 }
@@ -609,6 +612,10 @@ impl CardRegistryBuilder {
                         }
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
+                        }
+                        // C142: the owner's bundle total bounds the gain amount.
+                        crate::cards::CardEffect::AfterWorkerOptionalBundleGain { owner_goods, .. } => {
+                            owner_goods.iter().map(|(_, amount)| *amount).sum::<u32>()
                         }
                         crate::cards::CardEffect::OnPlayBuildPasture { .. } => 1,
                         crate::cards::CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost } => {

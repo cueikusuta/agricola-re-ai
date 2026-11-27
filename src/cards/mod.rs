@@ -519,6 +519,26 @@ pub enum CardEffect {
         /// The good granted (food on the printed card).
         good: Good,
     },
+    /// C142 てき屋 (Market Crier): each time the OWNER uses `space`
+    /// (GrainSeeds), the owner may take `owner_goods` as an all-or-nothing
+    /// bundle; if taken, every OTHER player gains `others_amount` of
+    /// `others_good`. Part of the bundle or other-players-only gain is
+    /// impossible by construction. Resolved as one atomic effect: the owner's
+    /// yes/no decision pauses the after-worker chain through
+    /// `PendingKind::Custom` (context type `after_worker_optional_bundle_gain`)
+    /// and both halves grant together on `apply_pending_resolution`, never
+    /// half and never twice across replay/resume.
+    AfterWorkerOptionalBundleGain {
+        /// The action space the owner must use for this to fire.
+        space: Space,
+        /// Goods the owner may take as one all-or-nothing bundle.
+        owner_goods: Vec<(Good, u32)>,
+        /// Good granted to every player except the owner, only when the
+        /// bundle is taken.
+        others_good: Good,
+        /// Amount of `others_good` granted to each other player.
+        others_amount: u32,
+    },
     /// D012 搾乳所 (Milking Place): +1 food in the feeding phase of each
     /// harvest (automatic, no decision). Resolved plan-free by the engine's
     /// harvest step; the phase scan stays dormant.
@@ -779,6 +799,7 @@ impl CardEffect {
             CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                 "after_worker_gain_other_accumulation_food"
             }
+            CardEffect::AfterWorkerOptionalBundleGain { .. } => "after_worker_optional_bundle_gain",
             CardEffect::OnPlayBuildStable { .. } => "on_play_build_stable",
             CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => "after_worker_gain_if_owns_animal",
             CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
@@ -1186,6 +1207,11 @@ impl CardSet {
                         }
                         CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { amount, .. } => {
                             *amount
+                        }
+                        // C142: the owner's all-or-nothing bundle total bounds
+                        // the gain amount to validate.
+                        CardEffect::AfterWorkerOptionalBundleGain { owner_goods, .. } => {
+                            owner_goods.iter().map(|(_, amount)| *amount).sum::<u32>()
                         }
                         CardEffect::OnPlayBuildPasture { .. } => 1,
                         CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost } => *food_cost,

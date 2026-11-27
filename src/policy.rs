@@ -648,6 +648,13 @@ fn card_priority(
                                 CardEffect::AfterWorkerGainOtherAccumulationFood { good, .. } => {
                                     card_good_value(*good) * 2 * horizon / 2
                                 }
+                                CardEffect::AfterWorkerOptionalBundleGain { owner_goods, others_good, others_amount, .. } => {
+                                    let owner_value: i64 = owner_goods
+                                        .iter()
+                                        .map(|(good, amount)| card_good_value(*good) * i64::from(*amount))
+                                        .sum();
+                                    (owner_value + card_good_value(*others_good) * i64::from(*others_amount)) * horizon / 4
+                                }
                 // OnPlayGainPerCount (ch3 OnPlayGainPerCount chapter): the exact
                 // per-count quantity needs board state this heuristic does not
                 // have, so use a per-kind typical count at play time.

@@ -2569,6 +2569,59 @@ impl Game {
                 Ok(())
             }
             (PendingKind::Custom { .. }, PendingResolution::Custom { payload }) => {
+                // C142 てき屋 (Market Crier): atomic owner yes/no on the
+                // grain+vegetable bundle; other players' grain rides on the
+                // same decision. Declined => nothing at all. The state-hash
+                // check on resolve_pending/replay keeps this from ever
+                // granting twice.
+                if pending.context.get("type").and_then(|v| v.as_str())
+                    == Some("after_worker_optional_bundle_gain")
+                {
+                    let confirmed = payload
+                        .get("confirmed")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    if confirmed {
+                        let owner = pending
+                            .context
+                            .get("owner")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(pending.player as u64)
+                            as usize;
+                        let owner_goods: Vec<(Good, u32)> = serde_json::from_value(
+                            pending
+                                .context
+                                .get("owner_goods")
+                                .cloned()
+                                .unwrap_or(serde_json::Value::Null),
+                        )
+                        .map_err(|e| format!("invalid owner_goods in pending context: {e}"))?;
+                        let others_good: Good = serde_json::from_value(
+                            pending
+                                .context
+                                .get("others_good")
+                                .cloned()
+                                .unwrap_or(serde_json::Value::Null),
+                        )
+                        .map_err(|e| format!("invalid others_good in pending context: {e}"))?;
+                        let others_amount = pending
+                            .context
+                            .get("others_amount")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32;
+                        let owner_player = &mut self.public.players[owner];
+                        for (good, amount) in &owner_goods {
+                            owner_player.supply.gain(*good, *amount);
+                        }
+                        for (idx, p) in self.public.players.iter_mut().enumerate() {
+                            if idx == owner {
+                                continue;
+                            }
+                            p.supply.gain(others_good, others_amount);
+                        }
+                    }
+                    Ok(())
+                } else
                 // Check if this is an A118 harvest field optional exchange
                 if pending.context.get("type").and_then(|v| v.as_str())
                     == Some("harvest_field_optional_exchange")
