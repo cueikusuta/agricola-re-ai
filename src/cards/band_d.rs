@@ -1,7 +1,7 @@
 //! D-deck band card definitions.
 use super::{
     CardDefinition, CardEffect, CardKind, CardRequirement, CountKind, FeedingExchangeOption,
-    ScoreBonusRule,
+    HarvestFieldRule, ScoreBonusRule,
 };
 use crate::model::{Animal, Good, Space};
 
@@ -115,6 +115,19 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
             vec![CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
                 threshold: 2,
                 good: Good::Grain,
+                amount: 1,
+            }],
+        ),
+        // D063 段地 (Lynchet): no cost, no points; during each harvest's field
+        // phase, gain 1 food per harvested field tile orthogonally adjacent to
+        // the house (BGA spec D063, per count("harvested_field_adjacent_house")).
+        card(
+            "D063",
+            CardKind::MinorImprovement,
+            vec![],
+            vec![CardEffect::HarvestFieldGain {
+                rule: HarvestFieldRule::FieldsAdjacentToHouse,
+                good: Good::Food,
                 amount: 1,
             }],
         ),
