@@ -191,6 +191,20 @@ pub struct Pasture {
     pub animal: Option<Animal>,
     pub quantity: u32,
 }
+
+/// C013 木製スライドハンマー (Wood Slide Hammer): on the owner's first
+/// renovation from a wooden house with at least `min_wooden_rooms` rooms,
+/// renovate directly to a stone house paying `discount` less stone.
+/// The condition (`house == Wood && rooms >= min_wooden_rooms`) is evaluated
+/// at renovation time and no longer holds after the renovation, so the rule
+/// fires at most once without a use-count ledger.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FirstRenovationStoneDiscount {
+    pub min_wooden_rooms: u32,
+    pub discount: u32,
+    pub direct_to_stone: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Player {
     pub id: usize,
@@ -223,6 +237,12 @@ pub struct Player {
     pub stone_cost_discount: u32,
     #[serde(default)]
     pub extra_housing: u8,
+    /// C013: first wooden-house renovation may skip clay and go straight to
+    /// stone at a stone discount. `#[serde(default)]` keeps pre-C013 saves
+    /// loadable; the field is deliberately excluded from `PlayerHashMaterialV5`
+    /// so `state_hash` values stay byte-identical to v5.
+    #[serde(default)]
+    pub first_renovation_stone: Option<FirstRenovationStoneDiscount>,
     pub begging: u32,
     /// Snapshot of total crop goods in fields at the end of the final harvest
     /// field phase. Used by D032 (木のくまで / Wood Rake) to award bonus points
@@ -260,6 +280,7 @@ impl Player {
             major_stone_discount_by_rooms: false,
             stone_cost_discount: 0,
             extra_housing: 0,
+            first_renovation_stone: None,
             begging: 0,
             field_goods_before_final_harvest: None,
         }
@@ -616,6 +637,8 @@ pub struct PublicState {
     /// Per-card use counts in the current round. Card plays are public
     /// actions, so the ledger is public state. Cleared at each round
     /// boundary; `serde(default)` keeps pre-aggregation saves loading.
+    /// Key format: "card_id:EventKind" (e.g., "TEST_LIMITED:WorkerPlaced"),
+    /// allowing per-(card, event_kind) limits within the same round period.
     #[serde(default)]
     pub card_uses: BTreeMap<String, u32>,
     /// Per-card use counts for the entire game. Used for "once_per_game"
@@ -1877,6 +1900,7 @@ impl Game {
                             start_player: next.public.start_player,
                             used_spaces: &used_spaces,
                             accumulations: None,
+                            animal_accumulations: None,
                             event_budget: &mut event_budget,
                             card_uses: &mut card_uses,
                             card_uses_game: &mut card_uses_game,
@@ -2017,6 +2041,7 @@ impl Game {
                         round,
                         start_player: next.public.start_player,
                         accumulations: None,
+                        animal_accumulations: None,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
                         card_uses: &mut card_uses,
@@ -2134,6 +2159,7 @@ impl Game {
                         // the core action's take, so the current public map is
                         // exactly what the original dispatch saw.
                         accumulations: Some(&next.public.accumulations),
+                        animal_accumulations: Some(&next.public.animal_accumulations),
                         round,
                         start_player: next.public.start_player,
                         used_spaces: &used_spaces,
@@ -2150,7 +2176,10 @@ impl Game {
                         space: Some(completion.action.space),
                         improvement: None,
                         baked: false,
-                        previous_player: None,
+                        // A068 counts fences built by THIS action, so the
+                        // resumed post-worker trigger needs the same
+                        // pre-action snapshot the original dispatch used.
+                        previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
@@ -2496,6 +2525,7 @@ impl Game {
                     // the core action's take, so the current public map holds
                     // exactly the amounts the original scan saw.
                     accumulations: Some(&self.public.accumulations),
+                    animal_accumulations: Some(&self.public.animal_accumulations),
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_uses_game: &mut self.public.card_uses_game,

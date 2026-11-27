@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "card_id": "C115",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "種まき人",
+    "name_en": "Sower"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2974",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_improvement",
+      "conditions": [
+        {
+          "predicate": "raw_text",
+          "params": {
+            "text": "the improvement built is a major improvement"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "stack_goods_on_card",
+            "good": "reed",
+            "amount_per_use": 1,
+            "source": "general_supply"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.conditions: 「大進歩を建設したとき」に絞る既存 predicate がない（after_improvement は大小両進歩で発火）。raw_text で保持し未解決",
+      "effects.1 (削除): 葦がカード上に蓄積し、いつでも供給へ移動または「種まき」アクションと交換可能。カード上在庫のモデリング未確定。anytime トリガーは語彙未定義（A071/C018/C057 と同様にフリー action API 未規定）のため effect を削除し未解決"
+    ],
+    "test_case_ids": [
+      "C115-normal",
+      "C115-edge"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Each time you build a major improvement, place 1 reed from the general supply on that card. At any time, you can move the reed to your supply or exchange it for a \"Sow\" action."
+  }
+}

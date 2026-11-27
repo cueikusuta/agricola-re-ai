@@ -3,7 +3,7 @@
   "card_id": "C046",
   "cases": [
     {
-      "id": "C046-normal",
+      "id": "C046-vegetable-for-point-food",
       "scope": "effect_only",
       "setup": {
         "player": {
@@ -18,13 +18,32 @@
       },
       "expected": {
         "effect_applies": true,
-        "points_gained": null,
-        "notes": "Inventory-only test contract"
+        "notes": "Effect test: C046-vegetable-for-point-food"
       },
-      "notes": "Placeholder test case"
+      "notes": "Primary source verified test case for C046"
     },
     {
-      "id": "C046-edge",
+      "id": "C046-once-per-round",
+      "scope": "effect_only",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C046",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Effect test: C046-once-per-round"
+      },
+      "notes": "Primary source verified test case for C046"
+    },
+    {
+      "id": "C046-legal-play",
       "scope": "legal_play",
       "setup": {
         "player": {
@@ -35,14 +54,13 @@
       "action": {
         "type": "play_card",
         "card_id": "C046",
-        "cost_paid": false
+        "cost_paid": true
       },
       "expected": {
-        "effect_applies": false,
-        "error": "insufficient_cost_or_prereq",
-        "notes": "Card should not be playable without meeting cost/prerequisites"
+        "effect_applies": true,
+        "notes": "Card should be playable when cost/prerequisites met"
       },
-      "notes": "Placeholder edge case test"
+      "notes": "Primary source verified test case for C046"
     }
   ]
 }

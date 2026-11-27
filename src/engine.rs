@@ -257,17 +257,38 @@ fn next_house(h: House) -> Option<(House, Good)> {
         House::Stone => None,
     }
 }
+
+/// Renovation target and extra stone discount for `p`, honoring C013 Wood
+/// Slide Hammer: the first renovation from a wooden house with at least
+/// `min_wooden_rooms` rooms may go directly to stone, paying `discount` less
+/// stone. The condition (`house == Wood && rooms >= min_wooden_rooms`) is
+/// evaluated at renovation time and no longer holds after the renovation, so
+/// no use-count ledger is kept. `extra_discount` only applies when the
+/// effective target is stone (i.e. `direct_to_stone` fired).
+pub(crate) fn renovation_target(p: &Player) -> Option<(House, Good, u32)> {
+    let mut target = next_house(p.house)?;
+    let mut extra_discount = 0;
+    if p.house == House::Wood {
+        if let Some(sh) = p.first_renovation_stone {
+            if (p.rooms() as u32) >= sh.min_wooden_rooms && sh.direct_to_stone {
+                target = (House::Stone, Good::Stone);
+                extra_discount = sh.discount;
+            }
+        }
+    }
+    Some((target.0, target.1, extra_discount))
+}
 fn can_renovate(p: &Player) -> bool {
-    next_house(p.house)
-        .map(|(_, g)| {
-            let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
-                p.stone_cost_discount
-            } else {
-                0
-            });
-            p.supply.reed >= 1 && p.supply.get(g) >= cost
-        })
-        .unwrap_or(false)
+    let Some((_, g, extra_discount)) = renovation_target(p) else {
+        return false;
+    };
+    let mut cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
+        p.stone_cost_discount
+    } else {
+        0
+    });
+    cost = cost.saturating_sub(extra_discount);
+    p.supply.reed >= 1 && p.supply.get(g) >= cost
 }
 fn available_room(p: &Player) -> bool {
     p.farm.iter().enumerate().any(|(i, c)| {
@@ -306,6 +327,48 @@ pub(crate) fn stable_site_available(p: &Player, i: usize) -> bool {
         && p.occupied_stables() < 4
         && !p.farm[i].stable
         && matches!(p.farm[i].tile, Tile::Empty | Tile::Pasture { .. })
+}
+
+/// Build one stable for a card effect (A001 雨除け / C002 厩 / E001 簡易納屋),
+/// paying `wood_cost` wood per stable (0 for these cards: the stable itself
+/// is free while the card cost is still paid). Legality mirrors the ordinary
+/// "Build Stables" action (`stable_site_available`): the farm holds at most
+/// 4 stables, the cell must be an empty farmyard cell or a pasture cell, and
+/// no stable may already stand there. Placement (which cell) is a detail
+/// decision made by the caller, not by this rule.
+pub(crate) fn build_free_stable(p: &mut Player, cell: usize, wood_cost: u32) -> Result<()> {
+    if !stable_site_available(p, cell) {
+        return Err("stable location illegal".into());
+    }
+    p.supply.pay(Good::Wood, wood_cost)?;
+    p.farm[cell].stable = true;
+    Ok(())
+}
+
+/// Legal cells for a card-driven free stable build, in farm order: every
+/// legal stable site, narrowed to `scope` (A001 雨除け: the cell of a fenced
+/// pasture spanning exactly `pasture_size` cells — "1農場スペースだけの牧場").
+pub(crate) fn free_stable_site_candidates(
+    p: &Player,
+    scope: crate::cards::StablePlacementScope,
+) -> Vec<usize> {
+    use crate::cards::StablePlacementScope::{AnySite, OneCellPasture};
+    (0..FARM_CELLS)
+        .filter(|&i| {
+            stable_site_available(p, i)
+                && match scope {
+                    AnySite => true,
+                    OneCellPasture { pasture_size } => {
+                        matches!(p.farm[i].tile, Tile::Pasture { id }
+                        if p.pastures.iter().any(|q| {
+                            q.id == id
+                                && q.cells.len() == usize::from(pasture_size)
+                                && q.cells.contains(&i)
+                        }))
+                    }
+                }
+        })
+        .collect()
 }
 fn can_build(p: &Player) -> bool {
     (p.supply.reed >= 2
@@ -463,7 +526,7 @@ impl Game {
         }
         // Worker trigger: AfterWorkerGain and AfterWorkerGainIfUsed, in the
         // active player's played_cards order.
-        let result = crate::card_events::dispatch_after_worker(
+        let result = crate::card_events::dispatch_after_worker_with_previous(
             &self.card_set,
             player,
             action.space,
@@ -475,12 +538,14 @@ impl Game {
             self.public.start_player,
             &self.public.used,
             &self.public.accumulations,
+            &self.public.animal_accumulations,
             &mut self.event_budget,
             &mut self.public.card_uses,
             &mut self.public.card_uses_game,
             &self.card_use_limits,
             &mut self.pending,
             allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
+            Some(previous.clone()),
         )?;
         if let Transition::Paused(_) = result {
             return Ok((result, Some(crate::pending::ChainStep::AfterWorker)));
@@ -1687,12 +1752,6 @@ impl Game {
                             &mut self.pending,
                             true, // is_improvement_action
                         )?;
-                        // Update card points
-                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                        crate::cards::update_card_points_on_play(
-                            &mut self.public.players[id],
-                            card.points,
-                        )?;
                         // Post-play pass (C006/C007 `PostPlayPassLeft`): pass
                         // the card to the left neighbor's hand.
                         {
@@ -1792,6 +1851,39 @@ impl Game {
                             .map_err(|e| e.to_string())?;
                         }
                     }
+                    Detail::Buy {
+                        improvement,
+                        instant_bake,
+                    } => {
+                        // D026 / E024 passive: a played AllowMajorViaMinor card
+                        // lets the owner build a major improvement with a Minor
+                        // Improvement (MeetingPlace) action. Queried from played
+                        // card definitions — no new Player state, and
+                        // buy_improvement's normal cost/market/exchange rules
+                        // are unchanged.
+                        if !major_improvement_allowed_via_minor(
+                            &self.card_set,
+                            &p.played_cards,
+                            *improvement,
+                        ) {
+                            return Err(format!(
+                                "{improvement:?} is not allowed on MeetingPlace without a matching played passive"
+                            ));
+                        }
+                        buy_improvement(
+                            p,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            &mut self.public.well_food_schedule,
+                            self.public.round,
+                            *improvement,
+                            PurchaseArgs {
+                                instant_bake: *instant_bake,
+                                allocation: None,
+                                mode: PurchaseMode::Auto,
+                            },
+                        )?;
+                    }
                     _ => return Err("invalid starting-player details".into()),
                 }
                 // Now handle the rest of the action
@@ -1855,12 +1947,6 @@ impl Game {
                     &self.card_use_limits,
                     &mut self.pending,
                     false, // is_improvement_action
-                )?;
-                // Update card points
-                let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                crate::cards::update_card_points_on_play(
-                    &mut self.public.players[id],
-                    card.points,
                 )?;
             }
             Space::DayLaborer => {
@@ -1969,12 +2055,6 @@ impl Game {
                         &self.card_use_limits,
                         &mut self.pending,
                         false, // is_improvement_action
-                    )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
                     )?;
                     // Post-play pass (C006/C007 `PostPlayPassLeft`): the same
                     // destination rule applies when the minor is played via
@@ -2094,12 +2174,6 @@ impl Game {
                         &mut self.pending,
                         true, // is_improvement_action
                     )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
-                    )?;
                     // Post-play pass (C006/C007 `PostPlayPassLeft`): pass the
                     // card to the left neighbor's hand after the play resolves.
                     {
@@ -2181,12 +2255,6 @@ impl Game {
                         &mut self.public.players[id],
                         &choice_options,
                         *option,
-                    )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
                     )?;
                     // Post-play pass (C006/C007 `PostPlayPassLeft`).
                     {
@@ -2522,12 +2590,13 @@ fn grow(p: &mut Player, room_only: bool) -> Result<()> {
     Ok(())
 }
 fn renovate(p: &mut Player) -> Result<()> {
-    let (new, g) = next_house(p.house).ok_or("stone is final house")?;
-    let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
+    let (new, g, extra_discount) = renovation_target(p).ok_or("stone is final house")?;
+    let mut cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
         p.stone_cost_discount
     } else {
         0
     });
+    cost = cost.saturating_sub(extra_discount);
     p.supply.pay(g, cost)?;
     p.supply.pay(Good::Reed, 1)?;
     p.house = new;
@@ -2683,6 +2752,39 @@ struct PurchaseArgs<'a> {
     allocation: Option<&'a [BakeAllocation]>,
     mode: PurchaseMode,
 }
+/// D026 / E024 passive: may a played card let the owner build `improvement`
+/// with a Minor Improvement (MeetingPlace) action? Queried from played card
+/// definitions only — no persistent Player state.
+/// D026 (`joinery_and_well_only = true`): Joinery and Well only.
+/// E024 (`joinery_and_well_only = false`): any major improvement.
+fn major_improvement_allowed_via_minor(
+    card_set: &crate::cards::CardSet,
+    played_cards: &[String],
+    improvement: Improvement,
+) -> bool {
+    played_cards.iter().any(|card_id| {
+        card_set.definition(card_id).is_some_and(|card| {
+            card.effects.iter().any(|e| {
+                if let crate::cards::CardEffect::Passive {
+                    rule:
+                        crate::cards::PassiveRule::AllowMajorViaMinor {
+                            joinery_and_well_only,
+                        },
+                } = e
+                {
+                    if *joinery_and_well_only {
+                        matches!(improvement, Improvement::Joinery | Improvement::Well)
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                }
+            })
+        })
+    })
+}
+
 fn buy_improvement(
     p: &mut Player,
     market: &mut Vec<Improvement>,
@@ -3087,6 +3189,59 @@ fn build_pastures(
         return Err("fencing must conserve existing animals".into());
     }
     Ok(())
+}
+
+/// Free single-cell pasture build (B002 小牧場 Mini Pasture): fence one empty
+/// farmyard cell into a pasture at no wood cost.
+///
+/// Rule constraints mirrored from `build_pastures` (2016 Lookout fencing):
+/// the cell must be an empty farmyard cell (no room/field), a stable on the
+/// cell is rejected so animal conservation never enters the picture, the new
+/// border segments must stay within the 15-segment fence limit, and the cell
+/// becomes a fresh empty pasture (`animal: None, quantity: 0`). Placement
+/// (which cell) is a detail decision made by the caller, not by this rule.
+pub(crate) fn build_free_single_cell_pasture(p: &mut Player, cell: usize) -> Result<()> {
+    if cell >= FARM_CELLS {
+        return Err("pasture cell out of range".into());
+    }
+    if !matches!(p.farm[cell].tile, Tile::Empty) {
+        return Err("a pasture can only be fenced on an empty farmyard cell".into());
+    }
+    if p.farm[cell].stable {
+        return Err("a stable cannot be fenced in by a free pasture build".into());
+    }
+    let edges = boundary(&[cell]);
+    if p.fences.len() + edges.iter().filter(|e| !p.fences.contains(*e)).count() > 15 {
+        return Err("fence limit 15".into());
+    }
+    let id = p.pastures.iter().map(|q| q.id).max().map_or(0, |n| {
+        n.checked_add(1).ok_or("pasture id overflow").unwrap()
+    });
+    p.farm[cell].tile = Tile::Pasture { id };
+    p.pastures.push(Pasture {
+        id,
+        cells: vec![cell],
+        animal: None,
+        quantity: 0,
+    });
+    p.fences.extend(edges);
+    Ok(())
+}
+
+/// Empty farmyard cells a free single-cell pasture (B002) may legally fence:
+/// empty, unstabled, and — when the player already owns a pasture — touching
+/// an existing pasture (2016 Lookout: new fences extend the fence network).
+pub(crate) fn free_single_cell_pasture_candidates(p: &Player) -> Vec<usize> {
+    (0..FARM_CELLS)
+        .filter(|&i| {
+            matches!(p.farm[i].tile, Tile::Empty)
+                && !p.farm[i].stable
+                && (p.pastures.is_empty()
+                    || neighbors(i)
+                        .iter()
+                        .any(|&j| matches!(p.farm[j].tile, Tile::Pasture { .. })))
+        })
+        .collect()
 }
 
 /// A deterministic candidate for an *empty* pasture split. An occupied

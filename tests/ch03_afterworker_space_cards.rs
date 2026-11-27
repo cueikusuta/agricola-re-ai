@@ -47,6 +47,7 @@ fn filler_card(kind: CardKind, index: usize) -> CardDefinition {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     }
 }
 
@@ -180,6 +181,7 @@ fn dispatch_aw(
         start_player,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &mut game.public.card_uses_game,

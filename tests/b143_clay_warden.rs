@@ -44,6 +44,7 @@ fn dispatch(
     let mut pending = None;
     let used = BTreeSet::new();
     let accumulations = BTreeMap::new();
+    let animal_accumulations = BTreeMap::new();
     dispatch_after_worker(
         set,
         actor,
@@ -56,6 +57,7 @@ fn dispatch(
         actor,
         &used,
         &accumulations,
+        &animal_accumulations,
         &mut budget,
         &mut uses,
         &mut uses_game,

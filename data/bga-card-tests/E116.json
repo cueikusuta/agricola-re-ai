@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "card_id": "E116",
+  "cases": [
+    {
+      "id": "E116-on-play-food",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play"
+      },
+      "action": {
+        "trigger": "on_play"
+      },
+      "expected": {
+        "gains": {
+          "food": 1
+        }
+      },
+      "notes": "Playing the card immediately grants 1 food."
+    },
+    {
+      "id": "E116-first-worker-wood",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "worker_ordinal": 1
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "sheep_accumulation"
+      },
+      "expected": {
+        "gains": {
+          "wood": 1
+        }
+      },
+      "notes": "1st worker on animal accumulation space gains 1 wood."
+    },
+    {
+      "id": "E116-third-worker-two-wood",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "worker_ordinal": 3
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "boar_accumulation"
+      },
+      "expected": {
+        "gains": {
+          "wood": 2
+        }
+      },
+      "notes": "3rd worker on animal accumulation space gains 2 wood."
+    },
+    {
+      "id": "E116-fifth-worker-three-wood",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "worker_ordinal": 5
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "cattle_accumulation"
+      },
+      "expected": {
+        "gains": {
+          "wood": 3
+        }
+      },
+      "notes": "5th worker on animal accumulation space gains 3 wood."
+    },
+    {
+      "id": "E116-non-animal-space-no-wood",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "worker_ordinal": 1
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "wood_accumulation"
+      },
+      "expected": {
+        "gains": {}
+      },
+      "notes": "Non-animal accumulation spaces do not trigger the effect."
+    }
+  ]
+}

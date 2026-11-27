@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "card_id": "C118",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "木材集め",
+    "name_en": "Wood Collector"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2971",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "good": "wood",
+            "amount": 1,
+            "rounds": 5
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "round_space_has_placed_good",
+          "params": {
+            "good": "wood"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.modeling: カード上に5ラウンド分の木材を予約配置するモデリング未確定（ラウンドスペースへの配置）"
+    ],
+    "test_case_ids": [
+      "C118-normal",
+      "C118-edge"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Place 1 wood on each of the next 5 round spaces. At the start of these rounds, you get the wood."
+  }
+}
