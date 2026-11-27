@@ -105,7 +105,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
-    "notes": "Gain 1 stone; while living in a 2-room wooden house all action spaces except Meeting Place count as unoccupied."
+    "implementation_status": "in_progress",
+    "notes": "Gain 1 stone; while living in a 2-room wooden house all action spaces except Meeting Place count as unoccupied. Chapter 1 (restack 2026-11-23): the on-play 1-stone gain is implemented with the existing OnPlayGain variant behind a MinimumPlayers(4) guard; the passive space-occupancy half awaits its trigger chapter."
   }
 }

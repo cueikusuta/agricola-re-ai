@@ -27,6 +27,7 @@ fn occ_def(id: &str) -> CardDefinition {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     }
 }
 
@@ -38,6 +39,7 @@ fn minor_def(id: &str) -> CardDefinition {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     }
 }
 
@@ -132,6 +134,7 @@ fn a109_apply_on_play_effects_no_supply_delta() {
             good: Good::Food,
             amount: 3,
         }],
+        post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 0);
     player.supply.set(Good::Food, 5);
@@ -158,6 +161,7 @@ fn a109_triggers_on_minor_improvement_play() {
                 good: Good::Food,
                 amount: 3,
             }],
+            post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
         },
         minor_def("MI1"),
     ]);
@@ -193,6 +197,7 @@ fn a109_not_triggered_by_occupation_play() {
                 good: Good::Food,
                 amount: 3,
             }],
+            post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
         },
         occ_def("OCC1"),
     ]);
@@ -228,6 +233,7 @@ fn a109_triggers_multiple_times() {
                 good: Good::Food,
                 amount: 3,
             }],
+            post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
         },
         minor_def("MI1"),
         minor_def("MI2"),
@@ -269,6 +275,7 @@ fn a109_only_triggers_for_improvements_played_after_it() {
                 good: Good::Food,
                 amount: 3,
             }],
+            post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
         },
         minor_def("MI1"),
         minor_def("MI2"),
@@ -311,6 +318,7 @@ fn a109_not_triggered_by_family_growth_growwithminor() {
                 good: Good::Food,
                 amount: 3,
             }],
+            post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
         },
         minor_def("MI1"),
     ]);
@@ -383,6 +391,7 @@ fn a109_triggers_on_major_improvement_play_minor() {
                 good: Good::Food,
                 amount: 3,
             }],
+            post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
         },
         minor_def("MI1"),
     ]);
@@ -466,6 +475,7 @@ fn engine_test_set() -> CardSet {
                 amount: 3,
             },
         ],
+        post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     });
     // Add TEST_MINOR as a test minor improvement (cost: Wood 3, Food 3) - B010 already exists in basic set
     set.definitions.push(agricola_re_ai::cards::CardDefinition {
@@ -475,6 +485,7 @@ fn engine_test_set() -> CardSet {
         cost: vec![(Good::Wood, 3), (Good::Food, 3)],
         points: 0,
         effects: vec![],
+        post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     });
     set
 }

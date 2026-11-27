@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "card_id": "E118",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "薪切り",
+    "name_en": "Kindling Gatherer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2635",
+        "language": "ja",
+        "checked_on": "2026-11-24",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-24",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "day_laborer",
+              "fishing",
+              "traveling_players",
+              "resource_market"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each time you use one of the food-providing action spaces Day Laborer, Fishing, Traveling Players, or Resource Market, gain 1 additional wood. The BGA wiki commentary also lists Archway and Forest Inn as triggering spaces; both are outside the 2016 base board and are not enumerated in the condition."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E118-wood-from-day-laborer",
+      "E118-wood-from-fishing",
+      "E118-wood-from-resource-market",
+      "E118-no-wood-from-non-food-space"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-24",
+    "implementation_status": "not_started",
+    "notes": "Each time you get food from an action space, gain 1 additional wood. The trigger spaces are enumerated as Day Laborer, Fishing, Traveling Players, and Resource Market — the same four spaces as the engine implementation (src/cards.rs verified_band_e_cards) and the base ledger role column (日雇い/漁/小劇場/資材市場). The BGA wiki commentary additionally lists Archway and Forest Inn as triggering spaces; both are outside the 2016 base board and are not enumerated in the condition. Classified as implemented in classification doc (stage outer per #375)."
+  }
+}

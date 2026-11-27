@@ -101,7 +101,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "In the feeding phase of each harvest, exchange 1 grain from your supply plus 1 grain from a field for 2 bonus points and 4 food."
   }
 }

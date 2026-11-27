@@ -12,9 +12,10 @@ fn verified_pool_has_fourteen_unique_occupations_and_minors() {
     // C141, A050, D061, C083, C147, A109, etc.
     // StartRoundGainIf* wave (B114/A157/A049/C067): B114/A049/C067 join the
     // preset (41 -> 44); A157 is 4 players only and stays out.
-    // D054 マスの池 (spec eligibility "2": "yes") joins the preset as a
-    // minor: 44 -> 45 total (occupations unchanged, minors 25 -> 26).
-    assert_eq!(set.definitions.len(), 45);
+    // D054 マスの池 joins from main (+1 minor: 44 -> 45).
+    // D026 大工の敷地 / E024 野心 add 2 more minors: 45 + 2 = 47 total.
+    // C013 Wood Slide Hammer (PR #487 merge) adds 1 more minor: 47 -> 48 total.
+    assert_eq!(set.definitions.len(), 48);
     assert_eq!(
         set.definitions
             .iter()
@@ -27,7 +28,7 @@ fn verified_pool_has_fourteen_unique_occupations_and_minors() {
             .iter()
             .filter(|c| c.kind == CardKind::MinorImprovement)
             .count(),
-        26
+        29
     );
     assert!(verified_basic_card_set(3).is_err());
 }

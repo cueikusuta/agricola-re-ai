@@ -85,7 +85,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "First renovation with 5+ wooden rooms: direct clay-to-stone skip, stone cost reduced by 2."
+    "implementation_status": "implemented",
+    "notes": "First renovation with 5+ wooden rooms: direct wood-to-stone renovation (skipping the intermediate clay house), stone cost reduced by 2."
   }
 }

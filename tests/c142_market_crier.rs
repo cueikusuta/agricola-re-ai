@@ -44,11 +44,15 @@ fn dispatch(
     let mut well = std::collections::BTreeMap::new();
     let mut budget = 100u32;
     let mut uses = std::collections::BTreeMap::new();
+    let mut uses_game = std::collections::BTreeMap::new();
     let limits = std::collections::BTreeMap::new();
     let mut pending = None;
     let used = std::collections::BTreeSet::new();
     let accumulations = std::collections::BTreeMap::new();
     let animal_accumulations = std::collections::BTreeMap::new();
+    // main's dispatcher threads the round's start player and the per-game
+    // use ledger next to the per-round one; the actor is the start player in
+    // this single-action fixture (same convention as a066/a140 tests).
     let transition = dispatch_after_worker(
         set,
         actor,
@@ -58,11 +62,13 @@ fn dispatch(
         &mut market,
         &mut well,
         1,
+        actor,
         &used,
         &accumulations,
         &animal_accumulations,
         &mut budget,
         &mut uses,
+        &mut uses_game,
         &limits,
         &mut pending,
         false,

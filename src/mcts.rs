@@ -8,6 +8,8 @@ use crate::model::{
     Space,
 };
 use crate::policy::{CardChoiceDetails, DetailPolicy, GreedyPolicy, SpacePolicy};
+#[cfg(test)]
+use crate::registry::EventKind;
 use crate::score::standings_with_cards;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -1192,8 +1194,14 @@ mod tests {
         // preset (spec eligibility "2": "no"), pool size 38->37.
         // Updated: StartRoundGainIf* wave — B114/A049/C067/D054 joined the
         // two-player preset (A157 stays out, 4 players only), pool size 37->41.
+        // Updated: D026 大工の敷地 / E024 野心 added to the preset
+        // (PR #501, intentional pool change: 45 -> 47 total cards).
+        // Updated (PR #487 merge): C013 Wood Slide Hammer added to
+        // verified_passive_cards — it enters the two-player preset for all
+        // player counts (47 -> 48 total), shifting the sample_game
+        // distribution (intentional: C013 is implemented).
         assert_eq!(
-            digest, "e31ba91801966821cf0f7cab9b6dd90a912df4bb0516eb6b451e37484cdb4f2b",
+            digest, "7f7d7477436afbb250106ea803d92cd0010a8265ee77125849de5410130a847b",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
@@ -1568,6 +1576,7 @@ mod tests {
                 amount: 1,
             }],
             use_limit: Some(1),
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let card_set = CardSet { definitions };
 
@@ -1628,7 +1637,9 @@ mod tests {
 
         let obs = game.observation(0).unwrap();
         assert_eq!(
-            obs.public.card_uses.get("TEST_LIMITED"),
+            obs.public
+                .card_uses
+                .get(&format!("TEST_LIMITED:{:?}", EventKind::WorkerPlaced)),
             Some(&1),
             "the card was really used once this round"
         );
@@ -1690,7 +1701,9 @@ mod tests {
         game.public.well_food_schedule.entry(2).or_default().push(0);
 
         // Set up some card_uses (simulating a card was used this round).
-        game.public.card_uses.insert("TEST_CARD".into(), 1);
+        game.public
+            .card_uses
+            .insert(format!("TEST_CARD:{:?}", EventKind::RoundStart), 1);
 
         // Save card_use_limits before start_round.
         let card_use_limits_before = game.card_use_limits.clone();

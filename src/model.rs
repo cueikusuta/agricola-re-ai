@@ -191,6 +191,20 @@ pub struct Pasture {
     pub animal: Option<Animal>,
     pub quantity: u32,
 }
+
+/// C013 木製スライドハンマー (Wood Slide Hammer): on the owner's first
+/// renovation from a wooden house with at least `min_wooden_rooms` rooms,
+/// renovate directly to a stone house paying `discount` less stone.
+/// The condition (`house == Wood && rooms >= min_wooden_rooms`) is evaluated
+/// at renovation time and no longer holds after the renovation, so the rule
+/// fires at most once without a use-count ledger.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FirstRenovationStoneDiscount {
+    pub min_wooden_rooms: u32,
+    pub discount: u32,
+    pub direct_to_stone: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Player {
     pub id: usize,
@@ -207,6 +221,17 @@ pub struct Player {
     pub played_cards: Vec<String>,
     #[serde(default)]
     pub card_points: i32,
+    /// Bonus points earned during the game by card effects that grant points
+    /// outside of card play (e.g. B132 地主's harvest-field bonus). Kept
+    /// separate from `card_points` because `card_points` must always equal the
+    /// sum of printed points of played cards (`CardState::validate_card_points`);
+    /// mid-game grants would break that invariant and the engine's incremental
+    /// validation. Counted at final scoring in `score.rs`.
+    /// Omitted from serialization while zero so LOG_VERSION=5 `state_hash`
+    /// values stay stable for pre-B132 games (like the empty-ledger rule for
+    /// `card_accumulations`, PR #327/#371).
+    #[serde(default, skip_serializing_if = "Player::bonus_points_is_zero")]
+    pub bonus_points: i32,
     #[serde(default)]
     pub pasture_capacity_bonus: u32,
     #[serde(default)]
@@ -223,6 +248,12 @@ pub struct Player {
     pub stone_cost_discount: u32,
     #[serde(default)]
     pub extra_housing: u8,
+    /// C013: first wooden-house renovation may skip clay and go straight to
+    /// stone at a stone discount. `#[serde(default)]` keeps pre-C013 saves
+    /// loadable; the field is deliberately excluded from `PlayerHashMaterialV5`
+    /// so `state_hash` values stay byte-identical to v5.
+    #[serde(default)]
+    pub first_renovation_stone: Option<FirstRenovationStoneDiscount>,
     pub begging: u32,
     /// Snapshot of total crop goods in fields at the end of the final harvest
     /// field phase. Used by D032 (木のくまで / Wood Rake) to award bonus points
@@ -252,6 +283,7 @@ impl Player {
             improvements: vec![],
             played_cards: vec![],
             card_points: 0,
+            bonus_points: 0,
             pasture_capacity_bonus: 0,
             free_fence_wood: 0,
             improvement_wood_discount: 0,
@@ -260,10 +292,19 @@ impl Player {
             major_stone_discount_by_rooms: false,
             stone_cost_discount: 0,
             extra_housing: 0,
+            first_renovation_stone: None,
             begging: 0,
             field_goods_before_final_harvest: None,
         }
     }
+    /// Keep LOG_VERSION=5 `state_hash` stable for games where no card has
+    /// granted bonus points yet: `bonus_points` is omitted from
+    /// serialization while zero, so old fixtures and pre-B132 replays hash
+    /// identically once the field stays unused.
+    fn bonus_points_is_zero(p: &i32) -> bool {
+        *p == 0
+    }
+
     pub fn rooms(&self) -> usize {
         self.farm
             .iter()
@@ -367,6 +408,23 @@ impl Improvement {
             Self::Joinery => vec![(Good::Wood, 2), (Good::Stone, 2)],
             Self::Pottery => vec![(Good::Clay, 2), (Good::Stone, 2)],
             Self::Basketry => vec![(Good::Reed, 2), (Good::Stone, 2)],
+        }
+    }
+
+    /// Stable, typed identifier for this improvement (used in A023's typed
+    /// pending payload instead of a `Debug` string).
+    pub fn id(&self) -> &'static str {
+        match self {
+            Self::Fireplace2 => "Fireplace2",
+            Self::Fireplace3 => "Fireplace3",
+            Self::Hearth4 => "Hearth4",
+            Self::Hearth5 => "Hearth5",
+            Self::ClayOven => "ClayOven",
+            Self::StoneOven => "StoneOven",
+            Self::Well => "Well",
+            Self::Joinery => "Joinery",
+            Self::Pottery => "Pottery",
+            Self::Basketry => "Basketry",
         }
     }
     pub fn is_cooking(self) -> bool {
@@ -599,8 +657,15 @@ pub struct PublicState {
     /// Per-card use counts in the current round. Card plays are public
     /// actions, so the ledger is public state. Cleared at each round
     /// boundary; `serde(default)` keeps pre-aggregation saves loading.
+    /// Key format: "card_id:EventKind" (e.g., "TEST_LIMITED:WorkerPlaced"),
+    /// allowing per-(card, event_kind) limits within the same round period.
     #[serde(default)]
     pub card_uses: BTreeMap<String, u32>,
+    /// Per-card use counts for the entire game. Used for "once_per_game"
+    /// frequency effects (e.g., A018 Wheel Plow). Never cleared.
+    /// `serde(default)` keeps pre-aggregation saves loading.
+    #[serde(default)]
+    pub card_uses_game: BTreeMap<String, u32>,
     /// Per-card resource accumulations on played cards. Cards that place
     /// resources on themselves (e.g., "place 1 wood on this card each round")
     /// store their accumulations here. Keyed by player index, then card ID,
@@ -1002,6 +1067,7 @@ impl Game {
             finished: false,
             well_food_schedule: BTreeMap::new(),
             card_uses: BTreeMap::new(),
+            card_uses_game: BTreeMap::new(),
             card_accumulations: BTreeMap::new(),
         };
         let log = GameLog {
@@ -1064,9 +1130,10 @@ impl Game {
         // Event log is intentionally omitted; this is the full game state, including hidden cards and RNG.
         // LOG_VERSION=5 compatibility: the hash tuple MUST stay identical to the
         // v5 format (7 fields, tests/fixtures/v5/*). New bookkeeping fields
-        // (well_food_schedule, pending, event_budget, card_uses, card_accumulations, next_decision_id)
-        // are serialized into saves via serde defaults, but are deliberately
-        // EXCLUDED from the hash so legacy v5 fixtures keep verifying.
+        // (well_food_schedule, pending, event_budget, card_uses, card_uses_game,
+        // card_accumulations, next_decision_id) are serialized into saves via
+        // serde defaults, but are deliberately EXCLUDED from the hash so legacy
+        // v5 fixtures keep verifying.
         // well_food_schedule, card_uses, and card_accumulations are Layer-0 public state and are
         // serialized into saves inside `public`; for the hash the public state
         // is projected onto its v5 field set (`hash_material_v5`), so hash
@@ -1089,8 +1156,8 @@ impl Game {
 
     /// Full integrity hash covering the whole `Game`, including the Step 3
     /// bookkeeping fields (`well_food_schedule`, `pending`, `event_budget`,
-    /// `card_uses`, `card_accumulations`, `next_decision_id`) that `state_hash` deliberately omits for
-    /// LOG_VERSION=5 compatibility.
+    /// `card_uses`, `card_uses_game`, `card_accumulations`, `next_decision_id`)
+    /// that `state_hash` deliberately omits for LOG_VERSION=5 compatibility.
     ///
     /// Use this for save/restore/resume integrity checks on NEW saves:
     /// `state_hash` keeps the v5 replay contract, while `integrity_hash` proves
@@ -1099,14 +1166,14 @@ impl Game {
     /// with a consistent state hash").
     ///
     /// `card_accumulations` is included only when non-empty (PR #371 backward
-    /// compatibility): empty ledger uses the 7-element tuple (same as pre-PR
-    /// #371) so existing saves keep their integrity_hash. Non-empty ledger uses
-    /// the 8-element tuple and any tampering is detected.
+    /// compatibility): empty ledger uses the 8-element tuple, non-empty ledger
+    /// uses the 9-element tuple and any tampering is detected. `card_uses_game`
+    /// (once-per-game counters, PR #392) is always covered: it is public state
+    /// whose integrity cannot be enforced by the v5-pinned `state_hash`.
     pub fn integrity_hash(&self) -> String {
         // Backward compatibility: when card_accumulations is empty, compute hash
-        // from 7-element tuple (same as before card_accumulations was added).
-        // This matches PR #327's bonus_points pattern: skip domain separator
-        // append for empty ledger so pre-existing saves keep same integrity_hash.
+        // from the shorter tuple. All v5 fixtures stamp `integrity_hash: null`,
+        // so the check is skipped for them and they keep loading unchanged.
         let data = if self.public.card_accumulations.is_empty() {
             serde_json::to_vec(&(
                 self.state_hash(),
@@ -1114,6 +1181,7 @@ impl Game {
                 &self.pending,
                 self.event_budget,
                 &self.public.card_uses,
+                &self.public.card_uses_game,
                 &self.card_use_limits,
                 self.next_decision_id,
             ))
@@ -1124,6 +1192,7 @@ impl Game {
                 &self.pending,
                 self.event_budget,
                 &self.public.card_uses,
+                &self.public.card_uses_game,
                 &self.public.card_accumulations,
                 &self.card_use_limits,
                 self.next_decision_id,
@@ -1403,6 +1472,7 @@ impl Game {
                 &self.public.accumulations,
                 &mut self.event_budget,
                 &mut self.public.card_uses,
+                &mut self.public.card_uses_game,
                 &self.card_use_limits,
                 &mut self.pending,
                 &self.public.revealed,
@@ -1808,6 +1878,7 @@ impl Game {
         let used_spaces = next.public.used.clone();
         let mut event_budget = next.event_budget;
         let mut card_uses = next.public.card_uses.clone();
+        let mut card_uses_game = next.public.card_uses_game.clone();
         let card_use_limits = next.card_use_limits.clone();
         let mut pending = next.pending.clone(); // Should be None after resolution
 
@@ -1843,11 +1914,16 @@ impl Game {
                             improvement_market: &mut improvement_market,
                             delayed_well: &mut delayed_well,
                             round,
+                            // The real round start player: a first-person-of-round
+                            // condition (e.g. A018) must keep its meaning through
+                            // the resume scan too.
+                            start_player: next.public.start_player,
                             used_spaces: &used_spaces,
                             accumulations: None,
                             animal_accumulations: None,
                             event_budget: &mut event_budget,
                             card_uses: &mut card_uses,
+                            card_uses_game: &mut card_uses_game,
                             card_use_limits: &card_use_limits,
                             pending: &mut pending,
                             actor: player,
@@ -1906,6 +1982,7 @@ impl Game {
                             next.delayed_well = delayed_well;
                             next.event_budget = event_budget;
                             next.public.card_uses = card_uses;
+                            next.public.card_uses_game = card_uses_game;
                             return self.commit_second_pause(
                                 next,
                                 p.as_ref(),
@@ -1956,6 +2033,7 @@ impl Game {
                             next.delayed_well = delayed_well;
                             next.event_budget = event_budget;
                             next.public.card_uses = card_uses;
+                            next.public.card_uses_game = card_uses_game;
                             return self.commit_second_pause(
                                 next,
                                 p.as_ref(),
@@ -1981,11 +2059,13 @@ impl Game {
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
                         round,
+                        start_player: next.public.start_player,
                         accumulations: None,
                         animal_accumulations: None,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
                         card_uses: &mut card_uses,
+                        card_uses_game: &mut card_uses_game,
                         card_use_limits: &card_use_limits,
                         pending: &mut pending,
                         actor: player,
@@ -2041,6 +2121,7 @@ impl Game {
                         next.delayed_well = delayed_well;
                         next.event_budget = event_budget;
                         next.public.card_uses = card_uses;
+                        next.public.card_uses_game = card_uses_game;
                         return self.commit_second_pause(
                             next,
                             p.as_ref(),
@@ -2100,9 +2181,11 @@ impl Game {
                         accumulations: Some(&next.public.accumulations),
                         animal_accumulations: Some(&next.public.animal_accumulations),
                         round,
+                        start_player: next.public.start_player,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
                         card_uses: &mut card_uses,
+                        card_uses_game: &mut card_uses_game,
                         card_use_limits: &card_use_limits,
                         pending: &mut pending,
                         actor: player,
@@ -2113,7 +2196,10 @@ impl Game {
                         space: Some(completion.action.space),
                         improvement: None,
                         baked: false,
-                        previous_player: None,
+                        // A068 counts fences built by THIS action, so the
+                        // resumed post-worker trigger needs the same
+                        // pre-action snapshot the original dispatch used.
+                        previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
@@ -2158,6 +2244,7 @@ impl Game {
                         next.delayed_well = delayed_well;
                         next.event_budget = event_budget;
                         next.public.card_uses = card_uses;
+                        next.public.card_uses_game = card_uses_game;
                         return self.commit_second_pause(
                             next,
                             p.as_ref(),
@@ -2213,6 +2300,7 @@ impl Game {
         next.delayed_well = delayed_well;
         next.event_budget = event_budget;
         next.public.card_uses = card_uses;
+        next.public.card_uses_game = card_uses_game;
         next.pending = pending; // Should remain None
 
         // Feeding/breeding plans from the original action (or generated now)
@@ -2450,6 +2538,7 @@ impl Game {
                     improvement_market: &mut self.public.improvement_market,
                     delayed_well: &mut self.delayed_well,
                     round: self.public.round,
+                    start_player: self.public.start_player,
                     used_spaces: &self.public.used,
                     // A140 ショベル運搬人 reads the OTHER clay accumulation
                     // at resolution time; the paused state was committed after
@@ -2459,6 +2548,7 @@ impl Game {
                     animal_accumulations: Some(&self.public.animal_accumulations),
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
+                    card_uses_game: &mut self.public.card_uses_game,
                     card_use_limits: &self.card_use_limits,
                     pending: &mut self.pending,
                     actor: pending.player,
@@ -2578,6 +2668,99 @@ impl Game {
                     Ok(())
                 } else {
                     // Extensible: other custom effects handle their own payload
+                    Ok(())
+                }
+            }
+            (
+                PendingKind::BuildStable {
+                    valid_sites,
+                    wood_cost,
+                    ..
+                },
+                PendingResolution::BuildStable { site_index },
+            ) => {
+                // `None` declines the optional effect (spec A015 is
+                // `optional: true`): nothing is built and nothing is paid.
+                let Some(&position) = site_index.as_ref() else {
+                    return Ok(());
+                };
+                // The resolution addresses the offered candidate list; the
+                // engine maps the position back to the farm site it was
+                // built from (same convention as the A023 candidate list).
+                let site = valid_sites[position];
+                let player = &mut self.public.players[pending.player];
+                // Pay wood cost
+                player.supply.pay(crate::model::Good::Wood, *wood_cost)?;
+                // Build stable
+                if player.farm[site].stable {
+                    return Err("stable already exists at site".into());
+                }
+                if !matches!(player.farm[site].tile, crate::model::Tile::Empty) {
+                    return Err("site not empty for stable".into());
+                }
+                player.farm[site].stable = true;
+                Ok(())
+            }
+            (
+                PendingKind::PlowFields { valid_sites, .. },
+                PendingResolution::PlowFields { site_indices },
+            ) => {
+                // An empty choice declines the optional effect (spec A018 is
+                // `optional: true`); otherwise the positions address the
+                // offered candidate list.
+                if site_indices.is_empty() {
+                    return Ok(());
+                }
+                let player = &mut self.public.players[pending.player];
+                for &idx in site_indices {
+                    let site = valid_sites[idx];
+                    if !matches!(player.farm[site].tile, crate::model::Tile::Empty) {
+                        return Err("site not empty for plow".into());
+                    }
+                    if player.farm[site].stable {
+                        return Err("cannot plow where stable exists".into());
+                    }
+                    player.farm[site].tile = crate::model::Tile::Field {
+                        crop: None,
+                        remaining: 0,
+                    };
+                }
+                Ok(())
+            }
+            (
+                PendingKind::ImprovementAction {
+                    available_improvements,
+                    must_spend_stone,
+                    ..
+                },
+                PendingResolution::ImprovementAction { improvement_index },
+            ) => {
+                let imp_option = &available_improvements[*improvement_index];
+                // Verify stone requirement
+                if *must_spend_stone && !imp_option.costs_stone {
+                    return Err("chosen improvement must cost at least 1 stone".into());
+                }
+                // Play the improvement
+                let player = &mut self.public.players[pending.player];
+                // Pay the cost
+                let mut paid = player.supply.clone();
+                for (good, amount) in &imp_option.cost {
+                    paid.pay(*good, *amount)?;
+                }
+                player.supply = paid;
+                // Remove from market and add to player
+                let improvement = self.public.improvement_market.remove(imp_option.index);
+                player.improvements.push(improvement);
+                Ok(())
+            }
+            (PendingKind::BakeBread { .. }, PendingResolution::BakeBread { confirmed }) => {
+                if *confirmed {
+                    // Execute the granted Bake Bread action with the engine's
+                    // canonical baking (oven capacity/rate table), so the
+                    // granted action and the space action can never disagree.
+                    crate::engine::bake_bread_max(&mut self.public.players[pending.player])
+                        .map(|_| ())
+                } else {
                     Ok(())
                 }
             }
