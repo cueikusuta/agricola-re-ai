@@ -15,7 +15,11 @@ fn verified_pool_has_fourteen_unique_occupations_and_minors() {
     // D054 マスの池 joins from main (+1 minor: 44 -> 45).
     // D026 大工の敷地 / E024 野心 add 2 more minors: 45 + 2 = 47 total.
     // C013 Wood Slide Hammer (PR #487 merge) adds 1 more minor: 47 -> 48 total.
-    assert_eq!(set.definitions.len(), 48);
+    // Renovation follow-up (D081/B016/A037) joins via
+    // verified_round_and_harvest_cards: 48 -> 51 total (minors +3).
+    // (Union of both sides' intentional pool changes; counts re-measured
+    // on the merge tree below.)
+    assert_eq!(set.definitions.len(), 51);
     assert_eq!(
         set.definitions
             .iter()
@@ -28,7 +32,7 @@ fn verified_pool_has_fourteen_unique_occupations_and_minors() {
             .iter()
             .filter(|c| c.kind == CardKind::MinorImprovement)
             .count(),
-        29
+        32
     );
     assert!(verified_basic_card_set(3).is_err());
 }

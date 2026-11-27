@@ -218,6 +218,19 @@ pub enum PendingKind {
         /// The space that triggered this effect.
         trigger_space: crate::model::Space,
     },
+    /// B016 解体ハンマー (Mining Hammer): after a renovation the owner MAY build
+    /// `free_stables` stables without paying wood. The decision carries the farm
+    /// cells that were legal stable sites when the renovation resolved; the
+    /// player answers with one cell or declines. Appended at the enum tail so
+    /// pre-B016 saves keep loading.
+    AfterRenovationBuildStable {
+        /// Source card ID that triggered this decision.
+        source_card: String,
+        /// Stable constructions the printed effect still owes the owner.
+        free_stables: u32,
+        /// Legal stable sites computed when the decision was created.
+        cells: Vec<usize>,
+    },
 }
 
 /// A single gain option.
@@ -302,6 +315,11 @@ pub enum PendingResolution {
     BakeBread {
         confirmed: bool,
     },
+    /// B016 解体ハンマー stable placement: one of the offered farm cells, or
+    /// `None` to decline the optional (printed "may") construction.
+    AfterRenovationBuildStable {
+        cell: Option<usize>,
+    },
 }
 
 impl PendingKind {
@@ -340,6 +358,14 @@ impl PendingKind {
             }),
             // A024: the granted action is baking; take it.
             Self::BakeBread { .. } => Some(PendingResolution::BakeBread { confirmed: true }),
+            // B016: the optional (printed "may") stable build is DECLINED on
+            // the one-shot headless path, matching the pre-split
+            // `pause_permitted = false` dispatcher behavior. The decline
+            // travels as a real `pending_resolution` event, so replay and the
+            // re-run hash stay exact.
+            Self::AfterRenovationBuildStable { .. } => {
+                Some(PendingResolution::AfterRenovationBuildStable { cell: None })
+            }
             _ => None,
         }
     }
@@ -470,6 +496,20 @@ impl PendingDecision {
                 }
             }
             (PendingKind::BakeBread { .. }, PendingResolution::BakeBread { .. }) => Ok(()),
+            (
+                PendingKind::AfterRenovationBuildStable { cells, .. },
+                PendingResolution::AfterRenovationBuildStable { cell },
+            ) => {
+                // Declining is always legal; a chosen cell must be one of the
+                // stable sites the decision offered when it was created.
+                match cell {
+                    None => Ok(()),
+                    Some(cell) if cells.contains(cell) => Ok(()),
+                    Some(_) => {
+                        Err("chosen stable site was not offered by the renovation decision".into())
+                    }
+                }
+            }
             _ => Err("resolution kind does not match pending decision kind".into()),
         }
     }

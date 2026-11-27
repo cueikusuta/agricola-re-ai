@@ -45,6 +45,12 @@ pub struct Config {
 fn default_player_count() -> usize {
     2
 }
+/// serde skip predicate for the D081 renovation reed discount: zero is the
+/// default and must not appear in JSON so pre-D081 saves, observations,
+/// `state_hash` material and content digests stay byte-identical.
+fn u32_is_zero(value: &u32) -> bool {
+    *value == 0
+}
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -254,6 +260,16 @@ pub struct Player {
     /// so `state_hash` values stay byte-identical to v5.
     #[serde(default)]
     pub first_renovation_stone: Option<FirstRenovationStoneDiscount>,
+    /// D081 屋根梯子 (Roof Ladder): reed saved on each renovation payment
+    /// (printed card: 1 less reed per renovation). Applied by the
+    /// `PassiveRule::RenovationReedDiscount` rule and consulted by the
+    /// renovation legality gate and payment (`engine::can_renovate` /
+    /// `engine::renovate`), following the `RoomCost`/`StoneDiscount`
+    /// connection pattern. `skip_serializing_if` keeps the zero state out of
+    /// JSON so existing saves, observations, state hashes and content digests
+    /// stay byte-identical (PR #327 pattern).
+    #[serde(default, skip_serializing_if = "u32_is_zero")]
+    pub renovation_reed_discount: u32,
     pub begging: u32,
     /// Snapshot of total crop goods in fields at the end of the final harvest
     /// field phase. Used by D032 (木のくまで / Wood Rake) to award bonus points
@@ -293,6 +309,7 @@ impl Player {
             stone_cost_discount: 0,
             extra_housing: 0,
             first_renovation_stone: None,
+            renovation_reed_discount: 0,
             begging: 0,
             field_goods_before_final_harvest: None,
         }
@@ -1929,6 +1946,7 @@ impl Game {
                             actor: player,
                             card_owner: player,
                             beneficiary: player,
+                            pause_permitted: true,
                         };
                         let trigger = crate::card_events::PhaseTriggerData {
                             space: None,
@@ -2071,6 +2089,7 @@ impl Game {
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
+                        pause_permitted: true,
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: None,
@@ -2191,6 +2210,7 @@ impl Game {
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
+                        pause_permitted: true,
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: Some(completion.action.space),
@@ -2554,6 +2574,7 @@ impl Game {
                     actor: pending.player,
                     card_owner,
                     beneficiary: card_owner,
+                    pause_permitted: false,
                 };
 
                 // Execute in chosen order
@@ -2779,6 +2800,20 @@ impl Game {
                         + plan.discard,
                 )
                 .map_err(|e| format!("animal placement failed: {e}"))
+            }
+            (
+                PendingKind::AfterRenovationBuildStable { .. },
+                PendingResolution::AfterRenovationBuildStable { cell },
+            ) => {
+                // B016 解体ハンマー: build the chosen stable at wood cost 0
+                // (site legality is re-checked so a stale decision can never
+                // place a stable illegally), or decline and change nothing.
+                let player = &mut self.public.players[pending.player];
+                match cell {
+                    None => Ok(()),
+                    Some(cell) => crate::engine::build_stable_with_wood(player, *cell, 0)
+                        .map_err(|e| format!("renovation stable failed: {e}")),
+                }
             }
             _ => Err("resolution kind does not match pending decision kind".into()),
         }

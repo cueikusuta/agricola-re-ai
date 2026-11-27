@@ -666,6 +666,27 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// D081 屋根梯子 (Roof Ladder): at the end of each renovation (the clay
+    /// construction trigger whose pre-action house differs in material from
+    /// the house after it), gain `amount` of `good` (printed card: 1 stone).
+    /// Fires from the existing `EventKind::ClayConstruction` After scan; the
+    /// renovation identification reuses the same trigger data as the legacy
+    /// `AfterClayConstructionGain` arm (site plus the pre-action player
+    /// snapshot) without adding an event kind or an event field.
+    AfterRenovationGain {
+        good: Good,
+        amount: u32,
+    },
+    /// B016 解体ハンマー (Mining Hammer): after each renovation the owner MAY
+    /// build up to `free_stables` stables without paying wood (printed card:
+    /// 1 stable at wood cost 0). The construction is optional, so the handler
+    /// pauses on a `PendingKind::AfterRenovationBuildStable` decision when the
+    /// dispatch can represent a pause (main's chosen-order pause contract),
+    /// and declines when it cannot (one-shot `apply`: the headless default in
+    /// `PendingKind::default_resolution`).
+    AfterRenovationBuildStable {
+        free_stables: u32,
+    },
 }
 
 /// One printed option of a harvest-feeding owner-chosen exchange.
@@ -814,6 +835,8 @@ impl CardEffect {
             CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { .. } => {
                 "after_worker_gain_if_animal_accumulation_at_least"
             }
+            CardEffect::AfterRenovationGain { .. } => "after_renovation_gain",
+            CardEffect::AfterRenovationBuildStable { .. } => "after_renovation_build_stable",
         }
     }
 }
@@ -889,6 +912,8 @@ pub enum PassiveRule {
         discount: u32,
         direct_to_stone: bool,
     },
+    /// D081 屋根梯子 (Roof Ladder): each renovation pays `n` less reed.
+    RenovationReedDiscount(u32),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1182,6 +1207,12 @@ impl CardSet {
                         CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
                             amount, ..
                         } => *amount,
+                        CardEffect::AfterRenovationGain { amount, .. } => *amount,
+                        // B016 builds a stable instead of granting goods; the
+                        // resource-amount sanity check has nothing to measure,
+                        // so it reports the neutral unit like the other
+                        // non-resource effects.
+                        CardEffect::AfterRenovationBuildStable { .. } => 1,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,
@@ -2036,6 +2067,9 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                         }),
                     };
                 }
+                // D081 屋根梯子: each renovation pays `n` less reed. The engine's
+                // renovation gate and payment consult the accumulated field.
+                PassiveRule::RenovationReedDiscount(n) => player.renovation_reed_discount += n,
             },
             CardEffect::OnPlayAddStoneToEmptyFields { good: _, amount } => {
                 for cell in &mut player.farm {
@@ -3494,10 +3528,11 @@ mod p1_2_repro_tests {
         // 2p プリセットのハッシュは D054（main 側 +1 minor）と D026/E024（本 PR +2 minors）
         // の追加により 39 -> 41 defs（content_hash 再計測済み、意図的変更）。
         // 加えて C013 木製スライドハンマー（PR #487 merge、+1 minor）後に再々計測。
+        // PR #452 union（D081/B016/A037、+3 minors: 48 -> 51 defs）後に再計測。
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
                     preset.content_hash(),
-                    "e0de7e8ebc9c09fe33fdc3095c4f40271bc6d1f08ceb83e6ea3724c41b360c04",
+                    "f2aeda07a00fc53dc3239418984dbef900044a7a80065c438c254a4ad0084624",
                     "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067/D054 joined the preset and A157 was excluded as 4p-only; re-measured again after C013 joined via the PR #487 merge)"
                 );
 

@@ -1287,6 +1287,63 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             }],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
+        // D081 屋根梯子 (Roof Ladder): each renovation costs 1 reed less and
+        // the renovating player gains 1 stone at the end of the action.
+        // Spec: data/bga-card-specs/D081.json (after_renovation: discount_cost
+        // reed 1 scope=renovation + gain_resource stone 1, every_use).
+        CardDefinition {
+            use_limit: None,
+            id: "D081".into(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::Passive {
+                    rule: PassiveRule::RenovationReedDiscount(1),
+                },
+                CardEffect::AfterRenovationGain {
+                    good: Good::Stone,
+                    amount: 1,
+                },
+            ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // B016 解体ハンマー (Mining Hammer): gain 1 food on play; after each
+        // renovation the owner may build 1 stable without paying wood.
+        // Spec: data/bga-card-specs/B016.json (on_play gain food 1 +
+        // after_renovation build_stable amount 1 wood_cost 0, optional).
+        CardDefinition {
+            use_limit: None,
+            id: "B016".into(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::AfterRenovationBuildStable { free_stables: 1 },
+            ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // A037 大枠のこぎり (Bucksaw): the printed effect is an OPTIONAL
+        // exchange after each renovation (pay 1 wood to gain 1 grain and 1
+        // point). That combination has no slot in the current effect
+        // vocabulary (no "pay X to gain Y + points" effect exists), so the
+        // effect part is recorded as needs_resolution in the PR body and the
+        // card is registered with its printed cost and no effects. Nothing is
+        // silently dropped from the spec: data/bga-card-specs/A037.json stays
+        // the source of record until the vocabulary gains the exchange.
+        CardDefinition {
+            use_limit: None,
+            id: "A037".into(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
     ]
 }
 
@@ -2460,9 +2517,11 @@ mod simple_occupation_tests {
         // (occupations 19, minors 26 -> 28).
         // C013 Wood Slide Hammer (PR #487 merge) joins as a 2p-eligible minor:
         // 47 -> 48 total (occupations 19, minors 28 -> 29).
-        assert_eq!(total, 48);
+        // PR #452 (D081/B016/A037) joins as three more 2p-eligible minors:
+        // 48 -> 51 total (occupations 19, minors 29 -> 32).
+        assert_eq!(total, 51);
         assert_eq!(occ, 19);
-        assert_eq!(minor, 29);
+        assert_eq!(minor, 32);
         assert!(verified_basic_card_set(3).is_err());
     }
 }

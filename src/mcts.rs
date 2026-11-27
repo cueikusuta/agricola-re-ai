@@ -1200,8 +1200,12 @@ mod tests {
         // verified_passive_cards — it enters the two-player preset for all
         // player counts (47 -> 48 total), shifting the sample_game
         // distribution (intentional: C013 is implemented).
+        // Updated (union with PR #452): D081/B016/A037 joined
+        // verified_round_and_harvest_cards and therefore the two-player
+        // verified preset (48 -> 51 total); digest re-measured on the merge
+        // tree.
         assert_eq!(
-            digest, "7f7d7477436afbb250106ea803d92cd0010a8265ee77125849de5410130a847b",
+            digest, "d354e0342c6363efbc1d60056acf0407120c798d7c42c296b1bfa4e0691d936a",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
