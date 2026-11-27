@@ -368,6 +368,14 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
                     EventKind::RoundStart
                 }
+                // A015/A018/A021/A023/A024 after_worker_space effects
+                crate::cards::CardEffect::AfterWorkerSpaceBuildStable { .. }
+                | crate::cards::CardEffect::AfterWorkerSpacePlowFields { .. }
+                | crate::cards::CardEffect::AfterWorkerSpaceFamilyGrowth { .. }
+                | crate::cards::CardEffect::AfterWorkerSpaceImprovementAction { .. }
+                | crate::cards::CardEffect::AfterWorkerSpaceBakeBread { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => {
                     EventKind::Harvest
                 }
@@ -648,6 +656,19 @@ impl CardRegistryBuilder {
                                                         .max()
                                                         .unwrap_or(1)
                                                 }
+                        // A015/A018/A021/A023/A024 after_worker_space amounts
+                        | crate::cards::CardEffect::AfterWorkerSpacePlowFields { amount, .. } => {
+                            *amount
+                        }
+                        | crate::cards::CardEffect::AfterWorkerSpaceFamilyGrowth {
+                            food_amount,
+                            ..
+                        } => *food_amount,
+                        | crate::cards::CardEffect::AfterWorkerSpaceBuildStable {
+                            wood_cost, ..
+                        } => *wood_cost,
+                        | crate::cards::CardEffect::AfterWorkerSpaceImprovementAction { .. }
+                        | crate::cards::CardEffect::AfterWorkerSpaceBakeBread { .. } => 1,
                                             };
                                             amount == 0 || amount > 30
                 })
@@ -1016,6 +1037,8 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
         crate::cards::verified_build_stable_cards(),
         // B-deck chapter 1: on-play simple cards (B002/B003/B005/B008/B009).
         crate::cards::verified_b_onplay_simple_cards(),
+        // A-deck after_worker_space simple gain cards (A015/A018/A021/A023/A024).
+        crate::cards::verified_after_worker_space_cards(),
     ];
     for cards in independent_cards {
         for players in 2..=4 {

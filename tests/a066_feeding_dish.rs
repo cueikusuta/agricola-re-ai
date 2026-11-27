@@ -48,6 +48,7 @@ fn dispatch(
     let mut well = BTreeMap::new();
     let mut budget = 100;
     let mut uses = BTreeMap::new();
+    let mut uses_game = BTreeMap::new();
     let limits = BTreeMap::new();
     let mut pending = None;
     let used = BTreeSet::new();
@@ -62,11 +63,13 @@ fn dispatch(
         &mut market,
         &mut well,
         1,
+        actor,
         &used,
         &accumulations,
         &animal_accumulations,
         &mut budget,
         &mut uses,
+        &mut uses_game,
         &limits,
         &mut pending,
         false,

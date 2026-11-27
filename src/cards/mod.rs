@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+mod after_worker_space;
 mod band_a;
 mod band_b;
 mod band_c;
@@ -22,6 +23,7 @@ mod band_d;
 mod band_e;
 mod presets;
 
+pub use after_worker_space::*;
 pub use band_a::*;
 pub use band_b::*;
 pub use band_c::*;
@@ -321,6 +323,37 @@ pub enum CardEffect {
         pay_good: Good,
         pay_amount: u32,
         animal: Animal,
+    },
+    /// A015 大工の手斧 (Carpenter's Axe): after the owner uses a wood accumulation
+    /// space (Forest, Copse, Grove) with at least 7 wood in supply, optionally
+    /// build 1 stable for 1 wood (instead of the normal 2 wood).
+    AfterWorkerSpaceBuildStable {
+        spaces: Vec<Space>,
+        min_wood: u32,
+        wood_cost: u32,
+    },
+    /// A018 車輪鋤 (Wheel Plow): once per game, when the owner is the first person
+    /// to place a worker in a round and uses Farmland or Cultivation, plow 2 fields.
+    AfterWorkerSpacePlowFields {
+        spaces: Vec<Space>,
+        amount: u32,
+    },
+    /// A021 家族向け住宅 (Family Friendly Home): after the owner uses Build Rooms
+    /// while rooms exceed people, also Family Growth and gain 1 food.
+    AfterWorkerSpaceFamilyGrowth {
+        space: Space,
+        food_amount: u32,
+    },
+    /// A023 採石事業所 (Stone Company): after the owner uses Western Quarry or
+    /// Eastern Quarry, grant an Improvement action that must spend at least 1 stone.
+    AfterWorkerSpaceImprovementAction {
+        spaces: Vec<Space>,
+        must_spend_stone: bool,
+    },
+    /// A024 脱穀板 (Threshing Board): after the owner uses Farmland or Cultivation,
+    /// grant an additional Bake Bread action.
+    AfterWorkerSpaceBakeBread {
+        spaces: Vec<Space>,
     },
     /// A109 小商人 (Small Trader): when an improvement is played from hand
     /// via a Major or Minor Improvement action, gain `amount` of `good`.
@@ -678,6 +711,13 @@ impl CardEffect {
             CardEffect::AfterWorkerGainAnimal { .. } => "after_worker_gain_animal",
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
+            CardEffect::AfterWorkerSpaceBuildStable { .. } => "after_worker_space_build_stable",
+            CardEffect::AfterWorkerSpacePlowFields { .. } => "after_worker_space_plow_fields",
+            CardEffect::AfterWorkerSpaceFamilyGrowth { .. } => "after_worker_space_family_growth",
+            CardEffect::AfterWorkerSpaceImprovementAction { .. } => {
+                "after_worker_space_improvement_action"
+            }
+            CardEffect::AfterWorkerSpaceBakeBread { .. } => "after_worker_space_bake_bread",
             CardEffect::OnPlayBuildPasture { .. } => "on_play_build_pasture",
             CardEffect::OnPlayDrawPlayOrPassOccupation { .. } => {
                 "on_play_draw_play_or_pass_occupation"
@@ -1088,6 +1128,11 @@ impl CardSet {
                         | CardEffect::AfterImprovementPlayedGain { amount, .. }
                         | CardEffect::OnPlayGainAnimal { amount, .. }
                         | CardEffect::AfterWorkerGainAnimal { amount, .. } => *amount,
+                        CardEffect::AfterWorkerSpacePlowFields { amount, .. } => *amount,
+                        CardEffect::AfterWorkerSpaceFamilyGrowth { food_amount, .. } => {
+                            *food_amount
+                        }
+                        CardEffect::AfterWorkerSpaceBuildStable { wood_cost, .. } => *wood_cost,
                         CardEffect::AfterHarvestGain { amount, .. }
                         | CardEffect::AfterHarvestGainIfAtLeast { amount, .. }
                         | CardEffect::StartRoundGainIfFamilyAndRooms { amount, .. }
@@ -1153,6 +1198,8 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
                         | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
                         | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 1,
+                        CardEffect::AfterWorkerSpaceImprovementAction { .. }
+                        | CardEffect::AfterWorkerSpaceBakeBread { .. } => 1,
                         CardEffect::HarvestFeedingGain { amount, .. } => *amount,
                         CardEffect::HarvestFeedingOptionalExchange { options, .. } => options
                             .iter()
@@ -3285,7 +3332,7 @@ mod p1_2_repro_tests {
             insert_cards(players, &verified_simple_occupations(players));
             insert_cards(players, &verified_multiplayer_passive_cards(players));
         }
-        let count_independent: [Vec<CardDefinition>; 12] = [
+        let count_independent: [Vec<CardDefinition>; 13] = [
             verified_immediate_resource_cards(),
             verified_round_and_harvest_cards(),
             verified_passive_cards(),
@@ -3301,6 +3348,7 @@ mod p1_2_repro_tests {
             verified_build_stable_cards(),
             // B-deck chapter 1: on-play simple cards (B002/B003/B005/B008/B009)
             verified_b_onplay_simple_cards(),
+            verified_after_worker_space_cards(),
         ];
         for cards in count_independent {
             for players in [2usize, 3, 4] {

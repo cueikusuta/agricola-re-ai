@@ -1389,6 +1389,7 @@ mod round_and_harvest_card_tests {
         let mut used_spaces = std::collections::BTreeSet::new();
         let mut event_budget = 100;
         let mut card_uses = BTreeMap::new();
+        let mut card_uses_game = BTreeMap::new();
         let card_use_limits = BTreeMap::new();
         let mut pending = None;
 
@@ -1402,11 +1403,13 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -1425,11 +1428,13 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -1448,11 +1453,13 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -1476,6 +1483,7 @@ mod round_and_harvest_card_tests {
         let mut used_spaces = std::collections::BTreeSet::new();
         let mut event_budget = 100;
         let mut card_uses = BTreeMap::new();
+        let mut card_uses_game = BTreeMap::new();
         let card_use_limits = BTreeMap::new();
         let mut pending = None;
 
@@ -1489,11 +1497,13 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -1514,11 +1524,13 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -1539,11 +1551,13 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -1707,6 +1721,7 @@ mod round_and_harvest_card_tests {
         let used = std::collections::BTreeSet::new();
         let mut event_budget = 100;
         let mut card_uses = BTreeMap::new();
+        let mut card_uses_game = BTreeMap::new();
         let card_use_limits = BTreeMap::new();
         let mut pending = None;
         dispatch_start_round(
@@ -1720,6 +1735,7 @@ mod round_and_harvest_card_tests {
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             &[],
@@ -1754,6 +1770,7 @@ mod round_and_harvest_card_tests {
         players[0].played_cards.push("A157".into());
         let mut event_budget = 100;
         let mut card_uses = BTreeMap::new();
+        let mut card_uses_game = BTreeMap::new();
         let card_use_limits = BTreeMap::new();
         let mut pending = None;
         dispatch_start_round(
@@ -1767,6 +1784,7 @@ mod round_and_harvest_card_tests {
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             &[],
@@ -1804,6 +1822,7 @@ mod round_and_harvest_card_tests {
         let used = std::collections::BTreeSet::new();
         let mut event_budget = 100;
         let mut card_uses = BTreeMap::new();
+        let mut card_uses_game = BTreeMap::new();
         let card_use_limits = BTreeMap::new();
         let mut pending = None;
         dispatch_start_round(
@@ -1817,6 +1836,7 @@ mod round_and_harvest_card_tests {
             accumulations,
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             &[],
@@ -1865,6 +1885,7 @@ mod round_and_harvest_card_tests {
         let used = std::collections::BTreeSet::new();
         let mut event_budget = 100;
         let mut card_uses = BTreeMap::new();
+        let mut card_uses_game = BTreeMap::new();
         let card_use_limits = BTreeMap::new();
         let mut pending = None;
         dispatch_start_round(
@@ -1878,6 +1899,7 @@ mod round_and_harvest_card_tests {
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             &[],
