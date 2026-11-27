@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "C120",
+  "cases": [
+    {
+      "id": "C120-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "card_clay": 0
+      },
+      "action": {
+        "play": "C120"
+      },
+      "expected": {
+        "card_clay": 8
+      },
+      "notes": "On play, 8 clay are stacked on the card (D118 pattern)."
+    },
+    {
+      "id": "C120-edge",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "card_clay": 8
+      },
+      "action": {
+        "gain_grain": true
+      },
+      "expected": {
+        "review_status": "needs_resolution",
+        "automatic_effect_execution_allowed": false
+      },
+      "notes": "The per-grain-gain trigger granularity is unresolved; that effect is dropped until a gain trigger exists (vocabulary rule 5)."
+    }
+  ]
+}

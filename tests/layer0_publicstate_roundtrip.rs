@@ -295,7 +295,10 @@ fn use_limit_ledger_survives_save_load_as_canonical_state() {
     })
     .unwrap_or_else(|e| panic!("day laborer must be playable at start: {e}"));
     assert_eq!(
-        game.public.card_uses.get("TEST_LIMITED"),
+        game.public.card_uses.get(&format!(
+            "TEST_LIMITED:{:?}",
+            agricola_re_ai::registry::EventKind::WorkerPlaced
+        )),
         Some(&1),
         "use_limit カードの使用が正本台帳に記録される"
     );
@@ -310,7 +313,13 @@ fn use_limit_ledger_survives_save_load_as_canonical_state() {
 
     // 観測射影にも台帳が乗り、再構築ゲームで一致する。
     let obs = game.observation(0).unwrap();
-    assert_eq!(obs.public.card_uses.get("TEST_LIMITED"), Some(&1));
+    assert_eq!(
+        obs.public.card_uses.get(&format!(
+            "TEST_LIMITED:{:?}",
+            agricola_re_ai::registry::EventKind::WorkerPlaced
+        )),
+        Some(&1)
+    );
     let mut rng = ChaCha8Rng::seed_from_u64(0xBEEF);
     let reconstructed = sample_game(&obs, &mut rng).expect("reconstruction must succeed");
     assert_eq!(reconstructed.public.card_uses, game.public.card_uses);

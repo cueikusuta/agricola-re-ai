@@ -368,6 +368,14 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
                     EventKind::RoundStart
                 }
+                // A015/A018/A021/A023/A024 after_worker_space effects
+                crate::cards::CardEffect::AfterWorkerSpaceBuildStable { .. }
+                | crate::cards::CardEffect::AfterWorkerSpacePlowFields { .. }
+                | crate::cards::CardEffect::AfterWorkerSpaceFamilyGrowth { .. }
+                | crate::cards::CardEffect::AfterWorkerSpaceImprovementAction { .. }
+                | crate::cards::CardEffect::AfterWorkerSpaceBakeBread { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => {
                     EventKind::Harvest
                 }
@@ -379,6 +387,9 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::AfterOccupationGain { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::HarvestFieldGain { .. } => EventKind::Harvest,
+                crate::cards::CardEffect::HarvestFieldGainPointsIfFarmyardFull { .. } => {
+                    EventKind::Harvest
+                }
                 crate::cards::CardEffect::AfterHarvestGain { .. } => {
                     EventKind::AfterHarvestComplete
                 }
@@ -415,7 +426,13 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                     EventKind::WorkerPlaced
                 }
+                crate::cards::CardEffect::AfterWorkerOptionalBundleGain { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::AfterWorkerGainIfFencesAtLeastRound { .. } => {
                     EventKind::WorkerPlaced
                 }
                 crate::cards::CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { .. } => {
@@ -446,7 +463,9 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
-                | crate::cards::CardEffect::EndGameBonus { .. } => continue,
+                | crate::cards::CardEffect::EndGameBonus { .. }
+                | crate::cards::CardEffect::HarvestFeedingGain { .. }
+                | crate::cards::CardEffect::HarvestFeedingOptionalExchange { .. } => continue,
                 #[cfg(test)]
                 crate::cards::CardEffect::PendingProbe { .. } => continue,
             };
@@ -549,6 +568,7 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainIfFencesAtLeastRound { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
                             amount,
                             ..
@@ -603,6 +623,10 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
                         }
+                        // C142: the owner's bundle total bounds the gain amount.
+                        crate::cards::CardEffect::AfterWorkerOptionalBundleGain { owner_goods, .. } => {
+                            owner_goods.iter().map(|(_, amount)| *amount).sum::<u32>()
+                        }
                         crate::cards::CardEffect::OnPlayBuildPasture { .. } => 1,
                         crate::cards::CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost } => {
                             *food_cost
@@ -644,8 +668,31 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::StartRoundPlaceFoodOnNextRoundSpaces {
                             ..
                         } => 1,
-                    };
-                    amount == 0 || amount > 30
+                        // B132: no good-amount to validate (points only)
+                        crate::cards::CardEffect::HarvestFieldGainPointsIfFarmyardFull { .. } => 1,
+                        | crate::cards::CardEffect::HarvestFeedingGain { amount, .. } => *amount,
+                                                | crate::cards::CardEffect::HarvestFeedingOptionalExchange { options, .. } => {
+                                                    options
+                                                        .iter()
+                                                        .map(|option| option.receive_food + if option.receive_animal { 1 } else { 0 })
+                                                        .max()
+                                                        .unwrap_or(1)
+                                                }
+                        // A015/A018/A021/A023/A024 after_worker_space amounts
+                        | crate::cards::CardEffect::AfterWorkerSpacePlowFields { amount, .. } => {
+                            *amount
+                        }
+                        | crate::cards::CardEffect::AfterWorkerSpaceFamilyGrowth {
+                            food_amount,
+                            ..
+                        } => *food_amount,
+                        | crate::cards::CardEffect::AfterWorkerSpaceBuildStable {
+                            wood_cost, ..
+                        } => *wood_cost,
+                        | crate::cards::CardEffect::AfterWorkerSpaceImprovementAction { .. }
+                        | crate::cards::CardEffect::AfterWorkerSpaceBakeBread { .. } => 1,
+                                            };
+                                            amount == 0 || amount > 30
                 })
                 || card.effects.iter().any(|effect| {
                     matches!(
@@ -1012,6 +1059,8 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
         crate::cards::verified_build_stable_cards(),
         // B-deck chapter 1: on-play simple cards (B002/B003/B005/B008/B009).
         crate::cards::verified_b_onplay_simple_cards(),
+        // A-deck after_worker_space simple gain cards (A015/A018/A021/A023/A024).
+        crate::cards::verified_after_worker_space_cards(),
     ];
     for cards in independent_cards {
         for players in 2..=4 {
@@ -1134,6 +1183,18 @@ fn merge_card_variants(
             }
 
             // Eligible for 2, 3 and 4 players (one implemented variant each)
+            eligible_players = vec![2, 3, 4];
+        }
+        "D035" => {
+            // D035 飼料部屋 (Fodder Chamber): per-player-count livestock
+            // threshold (2p: 7 animals/point, 3p: 5, 4p: 4). Every
+            // player-count variant carries the same cards.rs definition
+            // (all three guarded runs), so one variant suffices; eligibility
+            // covers all supported player counts and the per-player-run
+            // guards project exactly one end-game bonus per game.
+            if let Some(card) = by_players.get(&2) {
+                merged_effects = card.effects.clone();
+            }
             eligible_players = vec![2, 3, 4];
         }
         _ => {

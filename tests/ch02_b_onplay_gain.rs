@@ -21,8 +21,8 @@
 
 use agricola_re_ai::card_events::dispatch_play;
 use agricola_re_ai::cards::{
-    apply_on_play_effects, can_play, card_set_for_game, verified_band_b_cards, CardDefinition,
-    CardEffect, CardKind, CardRequirement, CardSet, PostPlayDestination,
+    apply_on_play_effects, can_play, card_set_for_game, verified_b_onplay_simple_cards_extended,
+    CardDefinition, CardEffect, CardKind, CardRequirement, CardSet,
 };
 use agricola_re_ai::model::{Good, Player};
 use agricola_re_ai::registry::{build_default_registry, CardPool};
@@ -75,10 +75,12 @@ const CHAPTER_CARDS: [ChapterCard; 4] = [
 ];
 
 fn chapter_card(id: &str) -> CardDefinition {
-    verified_band_b_cards()
+    verified_b_onplay_simple_cards_extended()
         .into_iter()
         .find(|card| card.id == id)
-        .unwrap_or_else(|| panic!("{id} must be defined in verified_band_b_cards"))
+        .unwrap_or_else(|| {
+            panic!("{id} must be defined in verified_b_onplay_simple_cards_extended")
+        })
 }
 
 /// CardSet holding every chapter card plus filler ids, so prerequisite and
@@ -96,7 +98,7 @@ fn chapter_set() -> CardSet {
         points: 0,
         effects: vec![],
         // filler card stays in the played area
-        post_play: PostPlayDestination::PlayedArea,
+        post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     });
     CardSet { definitions }
 }
@@ -339,7 +341,7 @@ fn padded_raw_set(card_id: &str, players: usize) -> CardSet {
                 points: 0,
                 effects: vec![],
                 // filler card stays in the played area
-                post_play: PostPlayDestination::PlayedArea,
+                post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
             });
         }
     }

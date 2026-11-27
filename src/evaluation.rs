@@ -1,6 +1,6 @@
 //! M2: public-observation-only evaluation and one-step action estimates.
 //! These projections rank actions; the rules engine remains the only authority.
-use crate::engine::{Action, Detail};
+use crate::engine::{renovation_target, Action, Detail};
 use crate::model::*;
 use crate::policy::{weight, DetailPolicy, SimpleDetails, SpacePolicy};
 use crate::score::score;
@@ -609,17 +609,13 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
             p.improvements.push(*improvement);
         }
         (Space::HouseRedevelopment | Space::FarmRedevelopment, Detail::Renovate { .. }) => {
-            let (new_house, good) = match p.house {
-                House::Wood => (House::Clay, Good::Clay),
-                House::Clay => (House::Stone, Good::Stone),
-                House::Stone => return None,
-            };
-            let discount = if good == Good::Stone {
+            let (new_house, good, extra_discount) = renovation_target(&p)?;
+            let mut cost = (p.rooms() as u32).saturating_sub(if good == Good::Stone {
                 p.stone_cost_discount
             } else {
                 0
-            };
-            let cost = (p.rooms() as u32).saturating_sub(discount);
+            });
+            cost = cost.saturating_sub(extra_discount);
             p.supply.set(good, p.supply.get(good).saturating_sub(cost));
             p.supply.reed = p.supply.reed.saturating_sub(1);
             p.house = new_house;

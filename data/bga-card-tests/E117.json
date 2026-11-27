@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "card_id": "E117",
+  "cases": [
+    {
+      "id": "E117-wood-at-harvest-with-grain-field",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "grain_fields": 1
+      },
+      "action": {
+        "trigger": "harvest_start"
+      },
+      "expected": {
+        "gains": {
+          "wood": 2
+        }
+      },
+      "notes": "With at least 1 grain field, gain 2 wood at harvest start."
+    },
+    {
+      "id": "E117-no-wood-without-grain-field",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "grain_fields": 0
+      },
+      "action": {
+        "trigger": "harvest_start"
+      },
+      "expected": {
+        "gains": {}
+      },
+      "notes": "With no grain fields, no wood is gained."
+    },
+    {
+      "id": "E117-multiple-harvests",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "grain_fields": 2
+      },
+      "action": {
+        "trigger": "harvest_start",
+        "repeat": 3
+      },
+      "expected": {
+        "gains_per_harvest": {
+          "wood": 2
+        },
+        "total_wood": 6
+      },
+      "notes": "Effect triggers at each harvest start while condition is met."
+    }
+  ]
+}
