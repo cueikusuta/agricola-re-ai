@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "card_id": "E119",
+  "cases": [
+    {
+      "id": "E119-play-round-4-get-resources",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "current_round": 4
+      },
+      "action": {
+        "trigger": "on_play"
+      },
+      "expected": {
+        "round_9_resources": {
+          "wood": 4,
+          "clay": 4
+        }
+      },
+      "notes": "Played in round 4 -> 4 wood and 4 clay placed on round 9 space."
+    },
+    {
+      "id": "E119-play-round-5-no-resources",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "current_round": 5
+      },
+      "action": {
+        "trigger": "on_play"
+      },
+      "expected": {
+        "round_9_resources": {}
+      },
+      "notes": "Played in round 5 -> no resources placed, no round 9 gain."
+    },
+    {
+      "id": "E119-round-9-collection",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "round_9_resources": {
+          "wood": 4,
+          "clay": 4
+        }
+      },
+      "action": {
+        "trigger": "round_start",
+        "round": 9
+      },
+      "expected": {
+        "gains": {
+          "wood": 4,
+          "clay": 4
+        }
+      },
+      "notes": "At round 9 start, collect the 4 wood and 4 clay."
+    }
+  ]
+}

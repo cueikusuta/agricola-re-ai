@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "card_id": "C114",
+  "cases": [
+    {
+      "id": "C114-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "stone": 1,
+        "grain": 0
+      },
+      "action": {
+        "use_space": "clay_pit"
+      },
+      "expected": {
+        "stone_delta": -1,
+        "grain_delta": 2
+      },
+      "notes": "After using the clay pit, pay 1 stone to gain 2 grain."
+    },
+    {
+      "id": "C114-edge",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "clay": 2,
+        "vegetable": 0
+      },
+      "action": {
+        "use_space": "western_quarry"
+      },
+      "expected": {
+        "clay_delta": -2,
+        "vegetable_delta": 1
+      },
+      "notes": "After using a quarry, pay 2 clay to gain 1 vegetable."
+    }
+  ]
+}

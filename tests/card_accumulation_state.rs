@@ -30,6 +30,7 @@ fn card_accumulations_field_exists_and_serializes() {
         finished: false,
         well_food_schedule: std::collections::BTreeMap::new(),
         card_uses: std::collections::BTreeMap::new(),
+        card_uses_game: std::collections::BTreeMap::new(),
         // New field - will cause compile error until added
         card_accumulations: std::collections::BTreeMap::new(),
     };

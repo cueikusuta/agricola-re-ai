@@ -105,7 +105,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-14",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "Cost stone3 grain3. Effect: end-game scoring: per player-count table (2p:7, 3p:5, 4p:4, 4p+:3 animals), 1 bonus point per threshold number of own livestock. Formalized as player_count_table over livestock count."
   }
 }

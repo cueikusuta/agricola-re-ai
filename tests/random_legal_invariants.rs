@@ -33,6 +33,7 @@ fn detail_kind(detail: &Detail) -> &'static str {
         Detail::MarketChoice(_) => "MarketChoice",
         Detail::PlayOccupation { .. } => "PlayOccupation",
         Detail::PlayMinor { .. } => "PlayMinor",
+        Detail::PlayMinorChoice { .. } => "PlayMinorChoice",
         Detail::GrowWithMinor { .. } => "GrowWithMinor",
         Detail::Plow { .. } => "Plow",
         Detail::Build { .. } => "Build",

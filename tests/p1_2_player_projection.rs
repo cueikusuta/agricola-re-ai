@@ -7,11 +7,12 @@
 //! tree and GREEN after the fix):
 //!
 //! (a) A raw (unprojected) B102 definition — the registry merge form that
-//!     carries BOTH the 2-player Clay 3 series and the 3-player Reed 2
-//!     series behind paired MinimumPlayers/MaximumPlayers guards — fires
-//!     both OnPlayGain effects when the card is played in a 2-player game,
-//!     because neither `CardSet::validate` nor the effect dispatcher treats
-//!     a paired guard as blocking at execution time.
+//!     carries ALL player-count series (2-player Clay 3, 3-player Reed 2 and
+//!     4-player Sheep 2 via OnPlayGainAnimal) behind paired
+//!     MinimumPlayers/MaximumPlayers guards — fires every series when the card
+//!     is played in a 2-player game, because neither `CardSet::validate` nor
+//!     the effect dispatcher treats a paired guard as blocking at execution
+//!     time.
 //! (b) Handing a raw A155 (MinimumPlayers(4) whole-card prerequisite) to a
 //!     2-player game entry (`Game::with_cards*`) is accepted today: the
 //!     paired-guard parser in `CardSet::validate` silently skips the
@@ -33,7 +34,7 @@ use agricola_re_ai::model::{Config, Good, Space};
 use agricola_re_ai::registry::build_default_registry;
 use agricola_re_ai::Game;
 
-/// The registry merge form of B102: both player-count series in one card,
+/// The registry merge form of B102: every player-count series in one card,
 /// each behind paired guards. This is what `merge_card_variants("B102", ..)`
 /// produces and what any unprojected set built from the registry carries.
 fn raw_b102_registry_form() -> CardDefinition {
@@ -65,6 +66,7 @@ fn raw_a155_definition() -> CardDefinition {
             gain(Space::TravelingPlayers, Good::Wood, 1),
             gain(Space::TravelingPlayers, Good::Grain, 1),
         ],
+        post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     }
 }
 
@@ -128,8 +130,8 @@ fn hands_with_b102_in_seat0(set: &CardSet) -> Vec<Vec<String>> {
 // =========================================================================
 
 #[test]
-fn raw_b102_def_carries_both_player_series() {
-    // Fixture premise: the registry B102 really is a dual-series card.
+fn raw_b102_def_carries_all_player_series() {
+    // Fixture premise: the registry B102 carries one series per player count.
     let b102 = raw_b102_registry_form();
     assert_eq!(
         b102.effects
@@ -137,7 +139,15 @@ fn raw_b102_def_carries_both_player_series() {
             .filter(|effect| matches!(effect, CardEffect::OnPlayGain { .. }))
             .count(),
         2,
-        "fixture premise: registry B102 carries two OnPlayGain series"
+        "fixture premise: registry B102 carries two OnPlayGain series (2p clay, 3p reed)"
+    );
+    assert_eq!(
+        b102.effects
+            .iter()
+            .filter(|effect| matches!(effect, CardEffect::OnPlayGainAnimal { .. }))
+            .count(),
+        1,
+        "fixture premise: registry B102 carries the 4p OnPlayGainAnimal sheep series"
     );
 }
 
@@ -228,6 +238,15 @@ fn raw_b102_both_series_fire_in_two_player_game() {
         1,
         "the 2-player game's B102 keeps exactly one 2p Clay series"
     );
+    assert_eq!(
+        b102_in_game
+            .effects
+            .iter()
+            .filter(|effect| matches!(effect, CardEffect::OnPlayGainAnimal { .. }))
+            .count(),
+        0,
+        "the 2-player game's B102 must not carry the 4p Sheep series"
+    );
 }
 
 #[test]
@@ -317,11 +336,11 @@ fn normal_entry_pool_excludes_a155_at_two_players() {
 
 #[test]
 fn minor_improvement_deal_minimum_boundary_is_pinned() {
-    // The implemented catalog currently exposes 37 minor improvements on this
-    // tree (main merged new minor cards after the 65-card era this fix's
-    // intake described — the 28/27 boundary this card cites was the intake-time
-    // count). Pin the CURRENT boundary honestly: users of the boundary are the
-    // 7-per-seat deal minimums 14/21/28 for 2/3/4 players.
+    // The implemented catalog currently exposes many minor improvements on
+    // this tree (main merged new minor cards after the 65-card era this
+    // fix's intake described — the 28/27 boundary this card cites was the
+    // intake-time count). Pin the CURRENT boundary honestly: users of the
+    // boundary are the 7-per-seat deal minimums 14/21/28 for 2/3/4 players.
     let registry = build_default_registry().expect("registry");
     let minors: Vec<CardDefinition> = registry
         .iter()
@@ -345,6 +364,7 @@ fn minor_improvement_deal_minimum_boundary_is_pinned() {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
         })
         .collect();
 
@@ -357,17 +377,34 @@ fn minor_improvement_deal_minimum_boundary_is_pinned() {
             .chain(filler_occupations.clone())
             .collect(),
     };
+    // The RAW catalog is rejected at every player count: D035 is the first
+    // minor improvement whose merged form carries raw Minimum/MaximumPlayers
+    // guard runs, and `CardSet::validate` by design (PR #368) rejects an
+    // unprojected set (B102/A133 are occupations, so this minor-only test
+    // never met that shape before D035). Pin the regression cause so the
+    // projection below stays necessary.
     for players in [2usize, 3, 4] {
         assert!(
-            with_all.validate(players).is_ok(),
+            with_all.validate(players).is_err(),
+            "raw unprojected catalog must be rejected at {players} players (D035 player guards)"
+        );
+    }
+    // Every game entry projects exactly once (PR #368); the deal minimum is
+    // judged on the PROJECTED set, which keeps the 7-per-seat intent above.
+    for players in [2usize, 3, 4] {
+        let projected = with_all
+            .projected_for_players(players)
+            .expect("full minor catalog must project at every player count");
+        assert!(
+            projected.validate(players).is_ok(),
             "{current_minors} minors + 28 occupations must validate at {players} players"
         );
     }
 
     // One minor short of the 4-player minimum: with the current catalog the
     // deal minimum fails exactly when the minor count drops below 28.
-    // (At 37 minors the transmission case needs the count reduced to 27, so
-    // remove down to 27 and confirm 4p fails while 2p/3p pass.)
+    // (The transmission case needs the count reduced to 27, so remove down
+    // to 27 and confirm 4p fails while 2p/3p pass.)
     let mut with_27 = with_all;
     while with_27
         .definitions
@@ -391,16 +428,29 @@ fn minor_improvement_deal_minimum_boundary_is_pinned() {
             .count(),
         27
     );
+    // The 28/27 boundary is judged on the PROJECTED set at each player
+    // count, exactly like the full-catalog check above (validate alone sees
+    // D035's raw player-count guard runs and rejects before reaching the
+    // deal minimum).
+    let projected_27_4p = with_27
+        .projected_for_players(4)
+        .expect("27 minors must project at 4 players");
     assert!(
-        with_27.validate(4).is_err(),
+        projected_27_4p.validate(4).is_err(),
         "27 minors must fail 4 players (28 needed)"
     );
+    let projected_27_3p = with_27
+        .projected_for_players(3)
+        .expect("27 minors must project at 3 players");
     assert!(
-        with_27.validate(3).is_ok(),
+        projected_27_3p.validate(3).is_ok(),
         "27 minors pass 3 players (21 needed)"
     );
+    let projected_27_2p = with_27
+        .projected_for_players(2)
+        .expect("27 minors must project at 2 players");
     assert!(
-        with_27.validate(2).is_ok(),
+        projected_27_2p.validate(2).is_ok(),
         "27 minors pass 2 players (14 needed)"
     );
 }

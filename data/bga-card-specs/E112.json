@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "card_id": "E112",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "穀物泥棒",
+    "name_en": "Grain Thief"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2641",
+        "language": "ja",
+        "checked_on": "2026-11-24",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-24",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_field_phase",
+      "conditions": [
+        {
+          "predicate": "harvesting_grain_field",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "leave_grain_take_from_supply",
+            "description": "Leave the grain on the field and take 1 grain from the general supply instead of harvesting from the field."
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "When harvesting a grain field, you may leave the grain on the field and take 1 grain from the general supply instead. The field retains its grain."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.trigger: exact trigger name for 'harvesting a grain field' not in vocabulary; 'harvest_field_phase' used provisionally",
+      "effects.0.conditions: predicate 'harvesting_grain_field' is custom; granularity of per-field vs per-harvest choice is undecided",
+      "effects.0.steps.0.params: custom 'other' operation with descriptive action; exact mechanical resolution (field grain count unchanged, supply grain gained) needs engine mapping"
+    ],
+    "test_case_ids": [
+      "E112-steal-from-supply",
+      "E112-field-retains-grain",
+      "E112-not-triggered-on-vegetable-field"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-24",
+    "implementation_status": "not_started",
+    "notes": "Each time you harvest a grain field, you may leave the grain on the field and take 1 grain from the general supply instead. The field's grain is not removed. Does not apply to vegetable fields."
+  }
+}

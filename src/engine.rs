@@ -66,6 +66,15 @@ pub enum Detail {
     PlayMinor {
         card_id: String,
     },
+    /// Play a minor improvement whose on-play effect offers a choice
+    /// (`OnPlayChoiceGain`, e.g. C007 刈り鋏): `option` is the index into the
+    /// card's option list. Kept as a separate detail so plain `PlayMinor`
+    /// keeps applying the first option for legacy callers and validation can
+    /// fail closed on out-of-range choices.
+    PlayMinorChoice {
+        card_id: String,
+        option: usize,
+    },
     GrowWithMinor {
         card_id: String,
     },
@@ -248,17 +257,38 @@ fn next_house(h: House) -> Option<(House, Good)> {
         House::Stone => None,
     }
 }
+
+/// Renovation target and extra stone discount for `p`, honoring C013 Wood
+/// Slide Hammer: the first renovation from a wooden house with at least
+/// `min_wooden_rooms` rooms may go directly to stone, paying `discount` less
+/// stone. The condition (`house == Wood && rooms >= min_wooden_rooms`) is
+/// evaluated at renovation time and no longer holds after the renovation, so
+/// no use-count ledger is kept. `extra_discount` only applies when the
+/// effective target is stone (i.e. `direct_to_stone` fired).
+pub(crate) fn renovation_target(p: &Player) -> Option<(House, Good, u32)> {
+    let mut target = next_house(p.house)?;
+    let mut extra_discount = 0;
+    if p.house == House::Wood {
+        if let Some(sh) = p.first_renovation_stone {
+            if (p.rooms() as u32) >= sh.min_wooden_rooms && sh.direct_to_stone {
+                target = (House::Stone, Good::Stone);
+                extra_discount = sh.discount;
+            }
+        }
+    }
+    Some((target.0, target.1, extra_discount))
+}
 fn can_renovate(p: &Player) -> bool {
-    next_house(p.house)
-        .map(|(_, g)| {
-            let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
-                p.stone_cost_discount
-            } else {
-                0
-            });
-            p.supply.reed >= 1 && p.supply.get(g) >= cost
-        })
-        .unwrap_or(false)
+    let Some((_, g, extra_discount)) = renovation_target(p) else {
+        return false;
+    };
+    let mut cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
+        p.stone_cost_discount
+    } else {
+        0
+    });
+    cost = cost.saturating_sub(extra_discount);
+    p.supply.reed >= 1 && p.supply.get(g) >= cost
 }
 fn available_room(p: &Player) -> bool {
     p.farm.iter().enumerate().any(|(i, c)| {
@@ -297,6 +327,48 @@ pub(crate) fn stable_site_available(p: &Player, i: usize) -> bool {
         && p.occupied_stables() < 4
         && !p.farm[i].stable
         && matches!(p.farm[i].tile, Tile::Empty | Tile::Pasture { .. })
+}
+
+/// Build one stable for a card effect (A001 雨除け / C002 厩 / E001 簡易納屋),
+/// paying `wood_cost` wood per stable (0 for these cards: the stable itself
+/// is free while the card cost is still paid). Legality mirrors the ordinary
+/// "Build Stables" action (`stable_site_available`): the farm holds at most
+/// 4 stables, the cell must be an empty farmyard cell or a pasture cell, and
+/// no stable may already stand there. Placement (which cell) is a detail
+/// decision made by the caller, not by this rule.
+pub(crate) fn build_free_stable(p: &mut Player, cell: usize, wood_cost: u32) -> Result<()> {
+    if !stable_site_available(p, cell) {
+        return Err("stable location illegal".into());
+    }
+    p.supply.pay(Good::Wood, wood_cost)?;
+    p.farm[cell].stable = true;
+    Ok(())
+}
+
+/// Legal cells for a card-driven free stable build, in farm order: every
+/// legal stable site, narrowed to `scope` (A001 雨除け: the cell of a fenced
+/// pasture spanning exactly `pasture_size` cells — "1農場スペースだけの牧場").
+pub(crate) fn free_stable_site_candidates(
+    p: &Player,
+    scope: crate::cards::StablePlacementScope,
+) -> Vec<usize> {
+    use crate::cards::StablePlacementScope::{AnySite, OneCellPasture};
+    (0..FARM_CELLS)
+        .filter(|&i| {
+            stable_site_available(p, i)
+                && match scope {
+                    AnySite => true,
+                    OneCellPasture { pasture_size } => {
+                        matches!(p.farm[i].tile, Tile::Pasture { id }
+                        if p.pastures.iter().any(|q| {
+                            q.id == id
+                                && q.cells.len() == usize::from(pasture_size)
+                                && q.cells.contains(&i)
+                        }))
+                    }
+                }
+        })
+        .collect()
 }
 fn can_build(p: &Player) -> bool {
     (p.supply.reed >= 2
@@ -441,6 +513,7 @@ impl Game {
             &self.public.used,
             &mut self.event_budget,
             &mut self.public.card_uses,
+            &mut self.public.card_uses_game,
             &self.card_use_limits,
             &mut self.pending,
             allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
@@ -453,7 +526,7 @@ impl Game {
         }
         // Worker trigger: AfterWorkerGain and AfterWorkerGainIfUsed, in the
         // active player's played_cards order.
-        let result = crate::card_events::dispatch_after_worker(
+        let result = crate::card_events::dispatch_after_worker_with_previous(
             &self.card_set,
             player,
             action.space,
@@ -462,12 +535,17 @@ impl Game {
             &mut self.public.improvement_market,
             &mut self.delayed_well,
             self.public.round,
+            self.public.start_player,
             &self.public.used,
+            &self.public.accumulations,
+            &self.public.animal_accumulations,
             &mut self.event_budget,
             &mut self.public.card_uses,
+            &mut self.public.card_uses_game,
             &self.card_use_limits,
             &mut self.pending,
             allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
+            Some(previous.clone()),
         )?;
         if let Transition::Paused(_) = result {
             return Ok((result, Some(crate::pending::ChainStep::AfterWorker)));
@@ -882,116 +960,70 @@ impl Game {
         )?;
         match card_transition {
             Transition::Completed => {}
-            Transition::Paused(_) if !allow_pause => {
-                // R2-P0-2: `apply`/`apply_with_harvest_policy` cannot represent a
-                // paused state. Reject BEFORE committing `next`, so the game is
-                // byte-for-byte unchanged and the caller gets a precise reason
-                // instead of a later opaque "illegal space" refusal.
-                return Err(
-                    "action paused on a pending decision; apply cannot represent an \
-                     interrupt — use apply_with_plans and Game::resolve_pending_and_resume"
-                        .into(),
-                );
-            }
-            Transition::Paused(mut pending) => {
-                // P0-1: Commit the mid-action state (worker action + partial card effects applied)
-                // so resume does not lose mid-action modifications.
-                // P1-3 FIX: Capture previous_player BEFORE committing state, so ClayConstruction
-                // trigger sees the pre-action player state (without the new improvement).
-                let previous_player = self.public.players[player].clone();
-                *self = next;
-                // Stamp the decision with engine-level metadata (Issue #268):
-                // - decision ID
-                // - state_hash_before (state hash before the action started)
-                // - increment next_decision_id
-                // - continuation position for resume
-                let decision_id = self.next_decision_id;
-                self.next_decision_id += 1;
-                pending.id = decision_id;
-                pending.state_hash_before = self.state_hash();
-                // Build continuation from the pause context (card index, effect index)
-                // and the work completion data needed to finish the action.
-                let after = pending
-                    .context
-                    .get("card_index")
-                    .and_then(|v| v.as_u64())
-                    .and_then(|ci| {
-                        pending
-                            .context
-                            .get("effect_index")
-                            .and_then(|v| v.as_u64())
-                            .map(|ei| crate::pending::ChainPosition {
-                                card_index: ci as usize,
-                                effect_index: ei as usize,
-                            })
-                    })
-                    .unwrap_or(crate::pending::ChainPosition {
-                        card_index: 0,
-                        effect_index: 0,
-                    });
-                // P1-3: Pass the actual ChainStep from apply_post_work_card_effects through the pause path
-                let step = pause_step.unwrap_or(crate::pending::ChainStep::AfterWorker);
-                // The phase the pause occurred in: a #270 ChooseTriggerOrder
-                // pause records the phase it collected the simultaneous
-                // triggers in ("After") in its context; the classic #268
-                // Interrupt pause has none, so it defaults to Interrupt.
-                let pause_phase = pending
-                    .context
-                    .get("phase")
-                    .and_then(|v| v.as_str())
-                    .map(|s| match s {
-                        "After" => crate::card_events::TriggerPhase::After,
-                        _ => crate::card_events::TriggerPhase::Interrupt,
-                    })
-                    .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
-                let resume = crate::pending::PostWorkResume {
-                    step,
-                    phase: pause_phase,
-                    after,
-                    // First segment of the logical action: the space/worker
-                    // bookkeeping has NOT been applied yet (it happens at
-                    // completion in `resume_post_work`).
-                    space_applied: false,
+            Transition::Paused(pending) if !allow_pause => {
+                // R2-P0-2 / PR #392 headless contract: `apply` /
+                // `apply_with_harvest_policy` cannot represent a paused state.
+                // A decision with a deterministic, legal default (the A-deck
+                // after_worker_space cards, whose handlers only offer legal
+                // options) is instead committed and resolved with that default
+                // inside this same transaction — so the AI, headless runners
+                // and batch simulations never stall on it. The default travels
+                // as a real `pending_resolution` event, so replay and the
+                // re-run hash stay exact. Every other decision keeps the
+                // precise Err below: `next` is NOT committed, so the game is
+                // byte-for-byte unchanged.
+                let Some(default) = pending.kind.default_resolution() else {
+                    return Err(
+                        "action paused on a pending decision; apply cannot represent an \
+                         interrupt — use apply_with_plans and Game::resolve_pending_and_resume"
+                            .into(),
+                    );
                 };
-                let completion = Box::new(crate::pending::WorkCompletion {
-                    action: action.clone(),
-                    previous_player,
-                    harvest_plans: forced.clone(),
-                    breeding_plans: forced_breeding.clone(),
-                    logged_before: if record {
-                        before.clone()
-                    } else {
-                        String::new()
-                    },
-                });
-                pending.continuation = crate::pending::Continuation::PostWork {
+                self.commit_pause_decision(
+                    next,
+                    pending,
                     player,
-                    resume,
-                    completion,
-                };
-                // Commit the stamped decision to self so it survives.
-                self.pending = Some((*pending).clone());
-                // Record the work event NOW, with `after` = the paused state.
-                // The mid-action state is committed (P0-1), so the event log must
-                // be able to reproduce it; the resolution event (logged by
-                // `resolve_pending_and_resume`) then chains to the final state.
-                if record {
-                    let payload = serde_json::to_value(RecordedAction::Work {
-                        player,
-                        action: action.clone(),
-                        harvest_plans: forced.clone(),
-                        breeding_plans: forced_breeding.clone(),
-                    })
-                    .map_err(|e| e.to_string())?;
-                    self.log.events.push(Event {
-                        player: Some(player),
-                        kind: "work".into(),
-                        payload,
-                        before: before.clone(),
-                        after: self.state_hash(),
-                    });
+                    &action,
+                    &forced,
+                    &forced_breeding,
+                    pause_step,
+                    before,
+                    record,
+                )?;
+                // Resolve the default and run its continuation. The resumed
+                // chain may pause again on another default-resolvable decision
+                // (two A-deck cards in play at once); keep resolving those so
+                // the one-shot contract still completes, but refuse a decision
+                // that genuinely needs a player rather than guessing.
+                let mut transition = self.resolve_pending_and_resume(default)?;
+                for _ in 0..crate::model::DEFAULT_EVENT_BUDGET {
+                    let Transition::Paused(ref second) = transition else {
+                        return Ok(transition);
+                    };
+                    let Some(next_default) = second.kind.default_resolution() else {
+                        return Err(
+                            "action paused on a pending decision; apply cannot represent an \
+                             interrupt — use apply_with_plans and Game::resolve_pending_and_resume"
+                                .into(),
+                        );
+                    };
+                    transition = self.resolve_pending_and_resume(next_default)?;
                 }
-                return Ok(Transition::Paused(pending));
+                return Err("headless default resolution did not converge".into());
+            }
+            Transition::Paused(pending) => {
+                let transition = self.commit_pause_decision(
+                    next,
+                    pending,
+                    player,
+                    &action,
+                    &forced,
+                    &forced_breeding,
+                    pause_step,
+                    before,
+                    record,
+                )?;
+                return Ok(transition);
             }
         }
         next.public.used.insert(action.space);
@@ -1063,6 +1095,123 @@ impl Game {
         *self = next;
         Ok(Transition::Completed)
     }
+
+    /// Commit the mid-action state of a paused card-effect decision and stamp
+    /// the engine-level metadata (Issue #268): the decision id, the
+    /// pre-decision `state_hash_before`, the typed post-work continuation, and
+    /// the paused `work` event (whose `after` is the paused hash). Shared by
+    /// the pause path (`apply_with_plans`, full interrupt contract) and the
+    /// PR #392 headless path (one-shot `apply`, which then resolves a
+    /// deterministic default) so the two cannot drift apart.
+    #[allow(clippy::too_many_arguments)]
+    fn commit_pause_decision(
+        &mut self,
+        next: Game,
+        mut pending: Box<crate::pending::PendingDecision>,
+        player: usize,
+        action: &Action,
+        forced: &Option<Vec<FeedingPlan>>,
+        forced_breeding: &Option<Vec<BreedingPlan>>,
+        pause_step: Option<crate::pending::ChainStep>,
+        before: String,
+        record: bool,
+    ) -> Result<Transition> {
+        // P1-3 FIX (origin/main): capture the pre-action player BEFORE the
+        // commit, so the ClayConstruction trigger on resume sees the player
+        // without the improvement this action bought.
+        let previous_player = self.public.players[player].clone();
+        // P0-1: commit the mid-action state (worker action + partial card
+        // effects applied) so resume does not lose mid-action modifications.
+        *self = next;
+        let decision_id = self.next_decision_id;
+        self.next_decision_id += 1;
+        pending.id = decision_id;
+        pending.state_hash_before = self.state_hash();
+        // Build continuation from the pause context (card index, effect index)
+        // and the work completion data needed to finish the action.
+        let after = pending
+            .context
+            .get("card_index")
+            .and_then(|v| v.as_u64())
+            .and_then(|ci| {
+                pending
+                    .context
+                    .get("effect_index")
+                    .and_then(|v| v.as_u64())
+                    .map(|ei| crate::pending::ChainPosition {
+                        card_index: ci as usize,
+                        effect_index: ei as usize,
+                    })
+            })
+            .unwrap_or(crate::pending::ChainPosition {
+                card_index: 0,
+                effect_index: 0,
+            });
+        // P1-3: pass the actual ChainStep from apply_post_work_card_effects
+        // through the pause path.
+        let step = pause_step.unwrap_or(crate::pending::ChainStep::AfterWorker);
+        // The phase the pause occurred in: a #270 ChooseTriggerOrder pause
+        // records the phase it collected the simultaneous triggers in ("After")
+        // in its context; the classic #268 Interrupt pause has none, so it
+        // defaults to Interrupt.
+        let pause_phase = pending
+            .context
+            .get("phase")
+            .and_then(|v| v.as_str())
+            .map(|s| match s {
+                "After" => crate::card_events::TriggerPhase::After,
+                _ => crate::card_events::TriggerPhase::Interrupt,
+            })
+            .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
+        let resume = crate::pending::PostWorkResume {
+            step,
+            phase: pause_phase,
+            after,
+            // First segment of the logical action: the space/worker
+            // bookkeeping has NOT been applied yet (it happens at
+            // completion in `resume_post_work`).
+            space_applied: false,
+        };
+        let completion = Box::new(crate::pending::WorkCompletion {
+            action: action.clone(),
+            previous_player,
+            harvest_plans: forced.clone(),
+            breeding_plans: forced_breeding.clone(),
+            logged_before: if record {
+                before.clone()
+            } else {
+                String::new()
+            },
+        });
+        pending.continuation = crate::pending::Continuation::PostWork {
+            player,
+            resume,
+            completion,
+        };
+        // Commit the stamped decision to self so it survives.
+        self.pending = Some((*pending).clone());
+        // Record the work event NOW, with `after` = the paused state.
+        // The mid-action state is committed (P0-1), so the event log must
+        // be able to reproduce it; the resolution event (logged by
+        // `resolve_pending_and_resume`) then chains to the final state.
+        if record {
+            let payload = serde_json::to_value(RecordedAction::Work {
+                player,
+                action: action.clone(),
+                harvest_plans: forced.clone(),
+                breeding_plans: forced_breeding.clone(),
+            })
+            .map_err(|e| e.to_string())?;
+            self.log.events.push(Event {
+                player: Some(player),
+                kind: "work".into(),
+                payload,
+                before,
+                after: self.state_hash(),
+            });
+        }
+        Ok(Transition::Paused(pending))
+    }
     /// Does the current placement finish a round that includes a harvest?
     /// The UI uses this to pause before the harvest choices are committed.
     pub fn will_harvest_after_work(&self) -> bool {
@@ -1090,8 +1239,24 @@ impl Game {
         next.execute_work(id, action)?;
         let (transition, _) =
             next.apply_post_work_card_effects(id, action, &self.public.players[id], false)?;
-        if let Transition::Paused(_) = transition {
-            return Err("preview cannot handle paused decision".into());
+        // PR #392 headless contract inside the read-only preview: a decision
+        // with a deterministic, legal default (the A-deck after_worker_space
+        // cards) is resolved with that default on the discarded clone, so the
+        // UI preview stays usable for games that play those cards. A decision
+        // that genuinely needs a player choice keeps the precise error: the
+        // preview never guesses a player's choice. The pending hash is stamped
+        // here because the preview commits nothing — the same stamp
+        // `commit_pause_decision` writes on the committed path.
+        let mut transition = transition;
+        while let Transition::Paused(ref pending) = transition {
+            let Some(resolution) = pending.kind.default_resolution() else {
+                return Err("preview cannot handle paused decision".into());
+            };
+            let hash = next.state_hash();
+            if let Some(pending) = next.pending.as_mut() {
+                pending.state_hash_before = hash;
+            }
+            transition = next.resolve_pending_and_resume(resolution)?;
         }
         next.public.used.insert(action.space);
         next.public.workers_placed[id] += 1;
@@ -1536,6 +1701,22 @@ impl Game {
                 match detail {
                     Detail::None => {}
                     Detail::PlayMinor { card_id } if self.card_set.enabled() => {
+                        // Fail closed (same rule as the MajorImprovement arm).
+                        if let Some(card) = self.card_set.definition(card_id) {
+                            let choice_effects = card
+                                .effects
+                                .iter()
+                                .filter(|e| {
+                                    matches!(e, crate::cards::CardEffect::OnPlayChoiceGain { .. })
+                                })
+                                .count();
+                            if choice_effects > 0 {
+                                return Err(
+                                    "card requires a choice: use PlayMinorChoice with the chosen option"
+                                        .into(),
+                                );
+                            }
+                        }
                         // Validate and pay costs
                         crate::cards::play_validate_pay(
                             &self.card_set,
@@ -1571,11 +1752,136 @@ impl Game {
                             &mut self.pending,
                             true, // is_improvement_action
                         )?;
-                        // Update card points
+                        // Post-play pass (C006/C007 `PostPlayPassLeft`): pass
+                        // the card to the left neighbor's hand.
+                        {
+                            let num_players = self.public.players.len();
+                            let mut ctx = CardMoveCtx {
+                                cards: &mut self.cards,
+                                players: &mut self.public.players,
+                                improvement_market: &mut self.public.improvement_market,
+                            };
+                            crate::card_zones::handle_post_play_destination(
+                                &mut ctx,
+                                &self.card_set,
+                                id,
+                                card_id,
+                                num_players,
+                            )
+                            .map_err(|e| e.to_string())?;
+                        }
+                    }
+                    Detail::PlayMinorChoice { card_id, option } if self.card_set.enabled() => {
+                        // Same chain as the MajorImprovement arm: option
+                        // index is action data (validated against the card's
+                        // OnPlayChoiceGain option list), applied after the
+                        // dispatcher's Before scan.
+                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                        let choice_options: Vec<crate::cards::ChoiceGainOption> = card
+                            .effects
+                            .iter()
+                            .find_map(|e| match e {
+                                crate::cards::CardEffect::OnPlayChoiceGain { options } => {
+                                    Some(options.clone())
+                                }
+                                _ => None,
+                            })
+                            .unwrap_or_default();
+                        if choice_options.is_empty() {
+                            return Err("card does not offer an on-play choice".into());
+                        }
+                        if *option >= choice_options.len() {
+                            return Err("on-play choice index out of range".into());
+                        }
+                        crate::cards::play_validate_pay(
+                            &self.card_set,
+                            &mut self.cards.hands[id],
+                            &mut self.public.players[id],
+                            card_id,
+                            crate::cards::CardKind::MinorImprovement,
+                            0,
+                        )?;
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        play_from_hand(&mut ctx, id, card_id)?;
+                        dispatch_play(
+                            &self.card_set,
+                            id,
+                            card_id,
+                            0,
+                            &mut self.cards,
+                            &mut self.public.players,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            self.public.round,
+                            &self.public.used,
+                            &mut self.event_budget,
+                            &mut self.public.card_uses,
+                            &self.card_use_limits,
+                            &mut self.pending,
+                            false,
+                        )?;
+                        crate::cards::apply_choice_gain(
+                            &mut self.public.players[id],
+                            &choice_options,
+                            *option,
+                        )?;
                         let card = self.card_set.definition(card_id).ok_or("unknown card")?;
                         crate::cards::update_card_points_on_play(
                             &mut self.public.players[id],
                             card.points,
+                        )?;
+                        {
+                            let num_players = self.public.players.len();
+                            let mut ctx = CardMoveCtx {
+                                cards: &mut self.cards,
+                                players: &mut self.public.players,
+                                improvement_market: &mut self.public.improvement_market,
+                            };
+                            crate::card_zones::handle_post_play_destination(
+                                &mut ctx,
+                                &self.card_set,
+                                id,
+                                card_id,
+                                num_players,
+                            )
+                            .map_err(|e| e.to_string())?;
+                        }
+                    }
+                    Detail::Buy {
+                        improvement,
+                        instant_bake,
+                    } => {
+                        // D026 / E024 passive: a played AllowMajorViaMinor card
+                        // lets the owner build a major improvement with a Minor
+                        // Improvement (MeetingPlace) action. Queried from played
+                        // card definitions — no new Player state, and
+                        // buy_improvement's normal cost/market/exchange rules
+                        // are unchanged.
+                        if !major_improvement_allowed_via_minor(
+                            &self.card_set,
+                            &p.played_cards,
+                            *improvement,
+                        ) {
+                            return Err(format!(
+                                "{improvement:?} is not allowed on MeetingPlace without a matching played passive"
+                            ));
+                        }
+                        buy_improvement(
+                            p,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            &mut self.public.well_food_schedule,
+                            self.public.round,
+                            *improvement,
+                            PurchaseArgs {
+                                instant_bake: *instant_bake,
+                                allocation: None,
+                                mode: PurchaseMode::Auto,
+                            },
                         )?;
                     }
                     _ => return Err("invalid starting-player details".into()),
@@ -1641,12 +1947,6 @@ impl Game {
                     &self.card_use_limits,
                     &mut self.pending,
                     false, // is_improvement_action
-                )?;
-                // Update card points
-                let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                crate::cards::update_card_points_on_play(
-                    &mut self.public.players[id],
-                    card.points,
                 )?;
             }
             Space::DayLaborer => {
@@ -1756,12 +2056,25 @@ impl Game {
                         &mut self.pending,
                         false, // is_improvement_action
                     )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
-                    )?;
+                    // Post-play pass (C006/C007 `PostPlayPassLeft`): the same
+                    // destination rule applies when the minor is played via
+                    // family growth.
+                    {
+                        let num_players = self.public.players.len();
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        crate::card_zones::handle_post_play_destination(
+                            &mut ctx,
+                            &self.card_set,
+                            id,
+                            card_id,
+                            num_players,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    }
                 } else if !matches!(detail, Detail::None) {
                     return Err("invalid growth details".into());
                 }
@@ -1808,6 +2121,24 @@ impl Game {
             Space::MajorImprovement => match detail {
                 // Handle card play first (before borrowing p for the rest)
                 Detail::PlayMinor { card_id } if self.card_set.enabled() => {
+                    // Fail closed: choice-requiring OnPlayChoiceGain cards
+                    // (C007 刈り鋏) must be played through PlayMinorChoice so
+                    // the chosen option is action data, never auto-resolved.
+                    if let Some(card) = self.card_set.definition(card_id) {
+                        let choice_effects = card
+                            .effects
+                            .iter()
+                            .filter(|e| {
+                                matches!(e, crate::cards::CardEffect::OnPlayChoiceGain { .. })
+                            })
+                            .count();
+                        if choice_effects > 0 {
+                            return Err(
+                                "card requires a choice: use PlayMinorChoice with the chosen option"
+                                    .into(),
+                            );
+                        }
+                    }
                     // Validate and pay costs (use internal fn; cards::play does full legacy for direct callers)
                     crate::cards::play_validate_pay(
                         &self.card_set,
@@ -1843,12 +2174,105 @@ impl Game {
                         &mut self.pending,
                         true, // is_improvement_action
                     )?;
-                    // Update card points
+                    // Post-play pass (C006/C007 `PostPlayPassLeft`): pass the
+                    // card to the left neighbor's hand after the play resolves.
+                    {
+                        let num_players = self.public.players.len();
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        crate::card_zones::handle_post_play_destination(
+                            &mut ctx,
+                            &self.card_set,
+                            id,
+                            card_id,
+                            num_players,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    }
+                }
+                Detail::PlayMinorChoice { card_id, option } if self.card_set.enabled() => {
+                    // Choice-requiring cards (C007 刈り鋏): validate the option
+                    // index against the card's OnPlayChoiceGain options first,
+                    // then run the same play chain; the chosen option is
+                    // applied after the dispatcher's Before scan (which is a
+                    // no-op for OnPlayChoiceGain).
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
+                    let choice_options: Vec<crate::cards::ChoiceGainOption> = card
+                        .effects
+                        .iter()
+                        .find_map(|e| match e {
+                            crate::cards::CardEffect::OnPlayChoiceGain { options } => {
+                                Some(options.clone())
+                            }
+                            _ => None,
+                        })
+                        .unwrap_or_default();
+                    if choice_options.is_empty() {
+                        return Err("card does not offer an on-play choice".into());
+                    }
+                    if *option >= choice_options.len() {
+                        return Err("on-play choice index out of range".into());
+                    }
+                    // Validate and pay costs
+                    crate::cards::play_validate_pay(
+                        &self.card_set,
+                        &mut self.cards.hands[id],
                         &mut self.public.players[id],
-                        card.points,
+                        card_id,
+                        crate::cards::CardKind::MinorImprovement,
+                        0,
                     )?;
+                    // Move card from hand to played
+                    let mut ctx = CardMoveCtx {
+                        cards: &mut self.cards,
+                        players: &mut self.public.players,
+                        improvement_market: &mut self.public.improvement_market,
+                    };
+                    play_from_hand(&mut ctx, id, card_id)?;
+                    // Dispatch Replace/Before phases
+                    dispatch_play(
+                        &self.card_set,
+                        id,
+                        card_id,
+                        0,
+                        &mut self.cards,
+                        &mut self.public.players,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        self.public.round,
+                        &self.public.used,
+                        &mut self.event_budget,
+                        &mut self.public.card_uses,
+                        &self.card_use_limits,
+                        &mut self.pending,
+                        false,
+                    )?;
+                    // Apply the chosen on-play gain option (C007).
+                    crate::cards::apply_choice_gain(
+                        &mut self.public.players[id],
+                        &choice_options,
+                        *option,
+                    )?;
+                    // Post-play pass (C006/C007 `PostPlayPassLeft`).
+                    {
+                        let num_players = self.public.players.len();
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        crate::card_zones::handle_post_play_destination(
+                            &mut ctx,
+                            &self.card_set,
+                            id,
+                            card_id,
+                            num_players,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    }
                 }
                 Detail::Buy {
                     improvement,
@@ -2166,12 +2590,13 @@ fn grow(p: &mut Player, room_only: bool) -> Result<()> {
     Ok(())
 }
 fn renovate(p: &mut Player) -> Result<()> {
-    let (new, g) = next_house(p.house).ok_or("stone is final house")?;
-    let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
+    let (new, g, extra_discount) = renovation_target(p).ok_or("stone is final house")?;
+    let mut cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
         p.stone_cost_discount
     } else {
         0
     });
+    cost = cost.saturating_sub(extra_discount);
     p.supply.pay(g, cost)?;
     p.supply.pay(Good::Reed, 1)?;
     p.house = new;
@@ -2273,11 +2698,93 @@ fn bake_bread(p: &mut Player, amount: u32) -> Result<()> {
     }
     bake_allocated(p, &allocation)
 }
+
+/// Bake as much grain as the player's improvements allow, using the same
+/// canonical capacity/rate table as [`bake_allocated`] (ovens first, then the
+/// best hearth/fireplace) and the same deterministic order as the legacy
+/// [`bake_bread`]. Returns `(grain baked, food produced)`.
+///
+/// This is the engine's single implementation of "take the Bake Bread
+/// action with everything you have": the A024 Threshing Board granted action
+/// resolves through it, so the granted action and the space action can never
+/// disagree about rates or oven capacities.
+pub(crate) fn bake_bread_max(p: &mut Player) -> Result<(u32, u32)> {
+    if p.supply.grain == 0 {
+        return Err("no grain to bake".into());
+    }
+    let mut left = p.supply.grain;
+    let mut allocation = Vec::new();
+    for (improvement, capacity) in [(Improvement::ClayOven, 1), (Improvement::StoneOven, 2)] {
+        if p.improvements.contains(&improvement) && left > 0 {
+            let grain = left.min(capacity);
+            left -= grain;
+            allocation.push(BakeAllocation { improvement, grain });
+        }
+    }
+    if left > 0 {
+        let card = p
+            .improvements
+            .iter()
+            .copied()
+            .find(|i| matches!(i, Improvement::Hearth4 | Improvement::Hearth5))
+            .or_else(|| {
+                p.improvements
+                    .iter()
+                    .copied()
+                    .find(|i| matches!(i, Improvement::Fireplace2 | Improvement::Fireplace3))
+            })
+            .ok_or("no baking improvement available")?;
+        allocation.push(BakeAllocation {
+            improvement: card,
+            grain: left,
+        });
+    }
+    let grain_baked = allocation.iter().map(|a| a.grain).sum();
+    // Food is measured from the canonical `bake_allocated` rates rather than
+    // re-deriving them, so the two can never drift apart.
+    let food_before = p.supply.get(Good::Food);
+    bake_allocated(p, &allocation)?;
+    let food_baked = p.supply.get(Good::Food) - food_before;
+    Ok((grain_baked, food_baked))
+}
 struct PurchaseArgs<'a> {
     instant_bake: u32,
     allocation: Option<&'a [BakeAllocation]>,
     mode: PurchaseMode,
 }
+/// D026 / E024 passive: may a played card let the owner build `improvement`
+/// with a Minor Improvement (MeetingPlace) action? Queried from played card
+/// definitions only — no persistent Player state.
+/// D026 (`joinery_and_well_only = true`): Joinery and Well only.
+/// E024 (`joinery_and_well_only = false`): any major improvement.
+fn major_improvement_allowed_via_minor(
+    card_set: &crate::cards::CardSet,
+    played_cards: &[String],
+    improvement: Improvement,
+) -> bool {
+    played_cards.iter().any(|card_id| {
+        card_set.definition(card_id).is_some_and(|card| {
+            card.effects.iter().any(|e| {
+                if let crate::cards::CardEffect::Passive {
+                    rule:
+                        crate::cards::PassiveRule::AllowMajorViaMinor {
+                            joinery_and_well_only,
+                        },
+                } = e
+                {
+                    if *joinery_and_well_only {
+                        matches!(improvement, Improvement::Joinery | Improvement::Well)
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                }
+            })
+        })
+    })
+}
+
 fn buy_improvement(
     p: &mut Player,
     market: &mut Vec<Improvement>,
@@ -2682,6 +3189,59 @@ fn build_pastures(
         return Err("fencing must conserve existing animals".into());
     }
     Ok(())
+}
+
+/// Free single-cell pasture build (B002 小牧場 Mini Pasture): fence one empty
+/// farmyard cell into a pasture at no wood cost.
+///
+/// Rule constraints mirrored from `build_pastures` (2016 Lookout fencing):
+/// the cell must be an empty farmyard cell (no room/field), a stable on the
+/// cell is rejected so animal conservation never enters the picture, the new
+/// border segments must stay within the 15-segment fence limit, and the cell
+/// becomes a fresh empty pasture (`animal: None, quantity: 0`). Placement
+/// (which cell) is a detail decision made by the caller, not by this rule.
+pub(crate) fn build_free_single_cell_pasture(p: &mut Player, cell: usize) -> Result<()> {
+    if cell >= FARM_CELLS {
+        return Err("pasture cell out of range".into());
+    }
+    if !matches!(p.farm[cell].tile, Tile::Empty) {
+        return Err("a pasture can only be fenced on an empty farmyard cell".into());
+    }
+    if p.farm[cell].stable {
+        return Err("a stable cannot be fenced in by a free pasture build".into());
+    }
+    let edges = boundary(&[cell]);
+    if p.fences.len() + edges.iter().filter(|e| !p.fences.contains(*e)).count() > 15 {
+        return Err("fence limit 15".into());
+    }
+    let id = p.pastures.iter().map(|q| q.id).max().map_or(0, |n| {
+        n.checked_add(1).ok_or("pasture id overflow").unwrap()
+    });
+    p.farm[cell].tile = Tile::Pasture { id };
+    p.pastures.push(Pasture {
+        id,
+        cells: vec![cell],
+        animal: None,
+        quantity: 0,
+    });
+    p.fences.extend(edges);
+    Ok(())
+}
+
+/// Empty farmyard cells a free single-cell pasture (B002) may legally fence:
+/// empty, unstabled, and — when the player already owns a pasture — touching
+/// an existing pasture (2016 Lookout: new fences extend the fence network).
+pub(crate) fn free_single_cell_pasture_candidates(p: &Player) -> Vec<usize> {
+    (0..FARM_CELLS)
+        .filter(|&i| {
+            matches!(p.farm[i].tile, Tile::Empty)
+                && !p.farm[i].stable
+                && (p.pastures.is_empty()
+                    || neighbors(i)
+                        .iter()
+                        .any(|&j| matches!(p.farm[j].tile, Tile::Pasture { .. })))
+        })
+        .collect()
 }
 
 /// A deterministic candidate for an *empty* pasture split. An occupied
