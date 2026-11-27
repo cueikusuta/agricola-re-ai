@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "card_id": "C107",
+  "cases": [
+    {
+      "id": "C107-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "bread_oven": true,
+        "grain": 2,
+        "food": 0
+      },
+      "action": {
+        "play": "C107",
+        "use_card": true
+      },
+      "expected": {
+        "bake_bread_granted": true
+      },
+      "notes": "On play, the bake-bread action is granted (optional)."
+    },
+    {
+      "id": "C107-edge",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "bread_oven": true,
+        "grain": 2,
+        "food": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "use_card": false
+      },
+      "expected": {
+        "bake_bread_granted": false,
+        "food_delta": 0
+      },
+      "notes": "At harvest feeding the grant is optional; declining it changes nothing."
+    }
+  ]
+}

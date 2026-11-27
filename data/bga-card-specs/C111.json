@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "card_id": "C111",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "小動物飼育員",
+    "name_en": "Small Animal Breeder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2978",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "raw_text",
+          "params": {
+            "text": "you have food equal to or higher than the current round number (e.g., 8+ food in round 8)"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.conditions: 「食料 >= 現在のラウンド番号」を満たす既存 predicate がない（resource_greater_than の than は資源名または整数、resource_at_least の n は整数）。語彙運用規則に従い raw_text で保持し未解決"
+    ],
+    "test_case_ids": [
+      "C111-normal",
+      "C111-edge"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Before the start of each round, if you have food equal to or higher than the current round number (e.g., 8+ food in round 8), you get 1 food."
+  }
+}
