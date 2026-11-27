@@ -323,7 +323,10 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainPerStored { .. }
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
+                | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                | crate::cards::CardEffect::OnPlayGainIfHarvestsEqualOccupations { .. } => {
+                    EventKind::CardPlayed
+                }
                 crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
                     EventKind::ImprovementPlayed
                 }
@@ -494,9 +497,11 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestGain { amount, .. }
-                        | crate::cards::CardEffect::AfterHarvestGainIfAtLeast { amount, .. } => {
-                            *amount
-                        }
+                        | crate::cards::CardEffect::AfterHarvestGainIfAtLeast { amount, .. }
+                        | crate::cards::CardEffect::OnPlayGainIfHarvestsEqualOccupations {
+                            amount,
+                            ..
+                        } => *amount,
                         crate::cards::CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,

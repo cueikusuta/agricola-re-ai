@@ -49,6 +49,8 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::OnPlayGain { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerStored { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainIfHouse { .. } => TriggerPhase::Before,
+        // B071 収穫小屋 is an instantaneous play-time gain — Before phase.
+        CardEffect::OnPlayGainIfHarvestsEqualOccupations { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerCount { .. } => TriggerPhase::Before,
         // On-play animal gain is an instantaneous play-time effect — Before
@@ -532,6 +534,12 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_on_play_gain_if_house(ctx, player, house, *rooms, good, *amount)?,
+                // B071 収穫小屋: completed harvests == played occupations.
+                CardEffect::OnPlayGainIfHarvestsEqualOccupations { good, amount } => {
+                    handle_on_play_gain_if_harvests_equal_occupations(
+                        ctx, player, good, *amount, round_now,
+                    )?
+                }
                 CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                     handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
                 }
@@ -1049,6 +1057,11 @@ fn effect_condition_holds(
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
+        // B071 収穫小屋: the completed-harvest count needs HARVEST_ROUNDS and
+        // the current round and the occupation count needs card definitions,
+        // so the scan reports it as triggerable and the handler performs the
+        // check (E111/C111 pattern).
+        CardEffect::OnPlayGainIfHarvestsEqualOccupations { .. } => true,
         CardEffect::OnPlayGainAnimal { .. } => true,
         CardEffect::AfterWorkerGainAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
@@ -1189,6 +1202,12 @@ pub fn execute_chosen_triggers(
                 good,
                 amount,
             } => handle_on_play_gain_if_house(ctx, player, house, *rooms, good, *amount)?,
+            // B071 収穫小屋: completed harvests == played occupations.
+            CardEffect::OnPlayGainIfHarvestsEqualOccupations { good, amount } => {
+                handle_on_play_gain_if_harvests_equal_occupations(
+                    ctx, player, good, *amount, round_now,
+                )?
+            }
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
             }
@@ -1606,6 +1625,39 @@ fn handle_on_play_gain_if_house(
 ) -> Result<EffectResult, String> {
     let p = &mut ctx.player;
     if p.house == *house && p.rooms() == usize::from(rooms) {
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B071 収穫小屋 (Harvest House): on play, when the number of completed
+/// harvests equals the number of occupations the owner has played, gain
+/// `amount` of `good`. The printed card grants 1 food, 1 grain and 1
+/// vegetable, so its definition carries three of these effects — one per
+/// good — and each is judged independently, which reproduces the printed
+/// bundle exactly (each good at most once).
+///
+/// The completed-harvest count comes from `HARVEST_ROUNDS` (harvests skip
+/// rounds, so `round - 1` would be wrong), and `occupation_count` never
+/// counts this minor improvement itself. The condition is re-checked here
+/// because `effect_condition_holds` has no card-set access (E111/C111
+/// pattern), which also keeps `execute_chosen_triggers` correct.
+fn handle_on_play_gain_if_harvests_equal_occupations(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    good: &Good,
+    amount: u32,
+    round: u8,
+) -> Result<EffectResult, String> {
+    let completed = crate::cards::completed_harvest_count(round);
+    let occupations = crate::cards::occupation_count(ctx.card_set, ctx.player) as u32;
+    if completed == occupations {
+        let p = &mut ctx.player;
         let next = p
             .supply
             .get(*good)

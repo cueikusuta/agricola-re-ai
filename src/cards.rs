@@ -350,6 +350,18 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// B071 収穫小屋 (Harvest House): on play, if the number of completed
+    /// harvests equals the number of occupations the owner has played, gain
+    /// `amount` of `good`. The printed card grants 1 food + 1 grain + 1
+    /// vegetable, so the definition carries three effects of this variant
+    /// (one per good). The condition is judged inside the handler (E111/C111
+    /// pattern): the completed-harvest count needs `HARVEST_ROUNDS` and the
+    /// current round, and the occupation count needs a card-definition lookup
+    /// (`occupation_count`, which never counts this minor improvement itself).
+    OnPlayGainIfHarvestsEqualOccupations {
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -432,6 +444,9 @@ impl CardEffect {
             }
             CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
                 "start_round_gain_if_no_harvest_and_animals"
+            }
+            CardEffect::OnPlayGainIfHarvestsEqualOccupations { .. } => {
+                "on_play_gain_if_harvests_equal_occupations"
             }
         }
     }
@@ -666,7 +681,10 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfFamilyAndRooms { amount, .. }
                         | CardEffect::StartRoundGainIfLessonsOccupants { amount, .. }
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
-                        | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. } => *amount,
+                        | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
+                        | CardEffect::OnPlayGainIfHarvestsEqualOccupations { amount, .. } => {
+                            *amount
+                        }
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,
@@ -1117,6 +1135,18 @@ pub fn affordable(card: &CardDefinition, player: &Player, extra_food: u32) -> bo
     card_costs(card, player, extra_food)
         .iter()
         .all(|(&good, &amount)| player.supply.get(good) >= amount)
+}
+
+/// Count the harvests completed before `round`: the number of
+/// `HARVEST_ROUNDS` entries strictly earlier than the current round (e.g. in
+/// round 8 the completed harvests are rounds 4 and 7, so the count is 2).
+/// B071 収穫小屋's condition reads this instead of `round - 1`, because
+/// harvests do not happen every round.
+pub(crate) fn completed_harvest_count(round: u8) -> u32 {
+    crate::model::HARVEST_ROUNDS
+        .iter()
+        .filter(|&&harvest_round| harvest_round < round)
+        .count() as u32
 }
 
 pub(crate) fn occupation_count(set: &CardSet, player: &Player) -> usize {
@@ -4899,6 +4929,33 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 CardEffect::OnPlayGainPerCount {
                     count_kind: CountKind::MajorImprovementsBottomRow,
                     good: Good::Food,
+                    amount: 1,
+                },
+            ],
+        },
+        // B071 収穫小屋 (Harvest House): cost wood 1 + clay 1 + reed 1, printed
+        // points 2. On play, when the number of completed harvests equals the
+        // number of occupations the owner has played, gain 1 food, 1 grain and
+        // 1 vegetable. The printed bundle is three separate gains, so the
+        // definition carries three OnPlayGainIfHarvestsEqualOccupations
+        // effects (one per good); the condition is judged inside the handler.
+        CardDefinition {
+            use_limit: None,
+            id: "B071".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1), (Good::Clay, 1), (Good::Reed, 1)],
+            points: 2,
+            effects: vec![
+                CardEffect::OnPlayGainIfHarvestsEqualOccupations {
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfHarvestsEqualOccupations {
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfHarvestsEqualOccupations {
+                    good: Good::Vegetable,
                     amount: 1,
                 },
             ],
