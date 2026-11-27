@@ -53,6 +53,8 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // B073 贈り物かご's room-count table is an instantaneous play-time
         // effect — Before phase, same as the other on-play gains.
         CardEffect::OnPlayGainIfRoomCount { .. } => TriggerPhase::Before,
+        // On-play resource exchange — Before phase (instantaneous at play time)
+        CardEffect::OnPlayExchange { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerCount { .. } => TriggerPhase::Before,
         // On-play animal gain is an instantaneous play-time effect — Before
@@ -633,6 +635,21 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_on_play_gain_if_room_count(ctx, player, *rooms, good, *amount)?,
+                CardEffect::OnPlayExchange {
+                    give,
+                    receive,
+                    give_is_cost,
+                    optional,
+                    cap,
+                } => handle_on_play_exchange(
+                    ctx,
+                    player,
+                    give,
+                    receive,
+                    *give_is_cost,
+                    *optional,
+                    *cap,
+                )?,
                 CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                     handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
                 }
@@ -1391,6 +1408,8 @@ fn effect_condition_holds(
         // legal site when the farm cannot take the stable, so the scan always
         // reports the effect triggerable.
         CardEffect::OnPlayBuildStable { .. } => true,
+        // On-play exchange triggers on card play (Before phase via dispatch_play).
+        CardEffect::OnPlayExchange { .. } => trigger.site == EventKind::CardPlayed,
         CardEffect::OnPlayGainAnimal { .. } => true,
         // B-deck on-play chapter 1: unconditional on CardPlayed; hand presence
         // and resource conditions are checked inside the handlers so the scan
@@ -1608,6 +1627,15 @@ pub fn execute_chosen_triggers(
                 good,
                 amount,
             } => handle_on_play_gain_if_room_count(ctx, player, *rooms, good, *amount)?,
+            CardEffect::OnPlayExchange {
+                give,
+                receive,
+                give_is_cost,
+                optional,
+                cap,
+            } => {
+                handle_on_play_exchange(ctx, player, give, receive, *give_is_cost, *optional, *cap)?
+            }
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
             }
@@ -2272,6 +2300,149 @@ fn handle_on_play_gain_if_room_count(
         .checked_add(amount)
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// Completed harvests before `round`: the number of `HARVEST_ROUNDS`
+/// ([4, 7, 9, 11, 13, 14]) harvests whose round is strictly below `round`.
+fn completed_harvests(round: u8) -> u32 {
+    crate::model::HARVEST_ROUNDS
+        .iter()
+        .filter(|&&r| r < round)
+        .count() as u32
+}
+
+/// On-play resource exchange handler.
+/// - If `give_is_cost` is true, the `give` resources were already paid as the card's play cost
+///   and are not deducted again.
+/// - If `give_is_cost` is false, the `give` resources are deducted now (A036).
+/// - `cap` limits the exchange amount for optional variable exchanges (A036:
+///   completed harvests).
+///
+/// UNITS, NOT ELEMENTS: the `give` bundle lists one entry per unit of each
+/// resource ONE exchange costs, so duplicate entries of the same resource
+/// multiply the per-unit price (D009 pays `[Sheep, Sheep]` = 2 sheep per
+/// exchange unit; A036 pays `[Food]` = 1 food per unit). The exchange amount is
+/// the largest number of units for which every DISTINCT give resource can
+/// still be paid from the same pool at once; paying per element would demand
+/// 2x the sheep per unit and fail every play (Round 1 review P1-1). Each
+/// receive entry grants `exchange_amount` of that resource.
+fn handle_on_play_exchange(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    give: &[crate::cards::ExchangeResource],
+    receive: &[crate::cards::ExchangeResource],
+    give_is_cost: bool,
+    optional: bool,
+    cap: Option<u32>,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    let round = ctx.round;
+
+    // A036's dynamic cap: "exchange any number of food for points, capped at
+    // the number of completed harvests" (spec `count: completed_harvest`).
+    // Derived from the dispatch round + HARVEST_ROUNDS — no new Player field
+    // and no new CardEffect variant (Round 1 review P1-2 / 補足).
+    let effective_cap = match cap {
+        Some(value) => Some(value),
+        None if optional => Some(completed_harvests(round)),
+        None => None,
+    };
+
+    let mut exchange_amount: u32 = 0;
+    if give_is_cost {
+        // The cost was already paid, so the exchange is a single fixed unit.
+        exchange_amount = 1;
+    } else {
+        // Non-cost give: units limited by every distinct give resource.
+        let mut settled: Vec<crate::cards::ExchangeResource> = Vec::new();
+        for give_res in give {
+            if settled.contains(give_res) {
+                continue;
+            }
+            settled.push(*give_res);
+            let per_unit = give.iter().filter(|other| *other == give_res).count() as u32;
+            let available = match give_res {
+                crate::cards::ExchangeResource::Good(g) => p.supply.get(*g),
+                crate::cards::ExchangeResource::Animal(a) => p.animal_count(*a),
+                crate::cards::ExchangeResource::Points => u32::MAX, // never held
+            };
+            let possible = available / per_unit.max(1);
+            if exchange_amount == 0 || possible < exchange_amount {
+                exchange_amount = possible;
+            }
+        }
+    }
+    if let Some(cap) = effective_cap {
+        exchange_amount = exchange_amount.min(cap);
+    }
+
+    // Optional exchange the player cannot fund resolves to nothing.
+    if optional && exchange_amount == 0 {
+        return Ok(EffectResult::Resolved);
+    }
+
+    // Deduct give resources (unless they were already paid as the cost).
+    // Each DISTINCT resource is paid once (the duplicate [Sheep, Sheep]
+    // entries are one 2-sheep price, not two separate payments).
+    if !give_is_cost && exchange_amount > 0 {
+        let mut settled: Vec<crate::cards::ExchangeResource> = Vec::new();
+        for give_res in give {
+            if settled.contains(give_res) {
+                continue;
+            }
+            settled.push(*give_res);
+            let per_unit = give.iter().filter(|other| *other == give_res).count() as u32;
+            let total_give = per_unit
+                .checked_mul(exchange_amount)
+                .ok_or("exchange overflow")?;
+            match give_res {
+                crate::cards::ExchangeResource::Good(g) => {
+                    p.supply.pay(*g, total_give)?;
+                }
+                crate::cards::ExchangeResource::Animal(a) => {
+                    // Deduct animals from pastures
+                    p.remove_animals(*a, total_give)?;
+                }
+                crate::cards::ExchangeResource::Points => {
+                    // Points are not deducted from player
+                }
+            }
+        }
+    }
+
+    // Grant receive resources
+    for receive_res in receive {
+        let total_receive = exchange_amount;
+        match receive_res {
+            crate::cards::ExchangeResource::Good(g) => {
+                let next = p
+                    .supply
+                    .get(*g)
+                    .checked_add(total_receive)
+                    .ok_or("resource overflow")?;
+                p.supply.set(*g, next);
+            }
+            crate::cards::ExchangeResource::Animal(a) => {
+                // Place through the canonical animal-placement vocabulary
+                // (auto_animal_plan + engine::place_animals, the same route as
+                // OnPlayGainAnimal / the animal market): a received animal must
+                // never manufacture a pasture with no farm cells (capacity 0),
+                // which would violate the pasture invariant (Round 1 review P2).
+                let plan = crate::card_events::auto_animal_plan(p, *a, total_receive);
+                crate::engine::place_animals(p, &plan, total_receive)
+                    .map_err(|e| format!("on-play exchange animal placement failed: {e}"))?;
+            }
+            crate::cards::ExchangeResource::Points => {
+                let next = p
+                    .card_points
+                    .checked_add(total_receive as i32)
+                    .ok_or("card points overflow")?;
+                p.card_points = next;
+            }
+        }
+    }
+
     Ok(EffectResult::Resolved)
 }
 

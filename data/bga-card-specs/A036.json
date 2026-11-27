@@ -118,7 +118,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
-    "notes": "Exchange any number of food for points, capped at the number of completed harvests."
+    "implementation_status": "implemented",
+        "notes": "Exchange any number of food for points, capped at the number of completed harvests. Implemented as CardEffect::OnPlayExchange (give Food, receive Points, optional) in src/cards/presets.rs verified_exchange_cards(); the completed-harvest cap is derived from DispatchContext.round + model::HARVEST_ROUNDS in card_events::handle_on_play_exchange — no new saved field. Dispatcher contract tests: tests/ch06_onplay_exchange.rs (A036-normal / A036-capped)."
   }
 }

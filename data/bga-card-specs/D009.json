@@ -93,7 +93,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-14",
-    "implementation_status": "not_started",
-    "notes": "Cost 2 sheep. Effect: immediately gain boar1 and cattle1 (= exchange 2 sheep for 1 boar + 1 cattle). Pass to left neighbor."
+    "implementation_status": "implemented",
+        "notes": "Cost 2 sheep. Effect: immediately gain boar1 and cattle1 (= exchange 2 sheep for 1 boar + 1 cattle). Pass to left neighbor. Implemented as CardEffect::OnPlayExchange (give [Sheep, Sheep] = one 2-sheep price per unit, receive [Boar, Cattle], give_is_cost false, optional false) plus PostPlayDestination::LeftNeighborHand in src/cards/presets.rs verified_exchange_cards(); animals are placed through auto_animal_plan + engine::place_animals. Dispatcher contract tests: tests/ch06_onplay_exchange.rs (D009-normal / D009-no-sheep)."
   }
 }

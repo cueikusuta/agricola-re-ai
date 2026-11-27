@@ -335,6 +335,26 @@ impl Player {
                 .count() as u32
             + u32::from(self.pet == Some(kind))
     }
+    /// Remove animals from the player's pastures.
+    pub fn remove_animals(&mut self, kind: Animal, count: u32) -> Result<(), String> {
+        let mut remaining = count;
+        for pasture in &mut self.pastures {
+            if pasture.animal == Some(kind) {
+                let take = remaining.min(pasture.quantity);
+                pasture.quantity -= take;
+                remaining -= take;
+                if remaining == 0 {
+                    break;
+                }
+            }
+        }
+        if remaining > 0 {
+            return Err("not enough animals to remove".into());
+        }
+        // Clean up empty pastures
+        self.pastures.retain(|p| p.quantity > 0);
+        Ok(())
+    }
     pub fn pasture_capacity(&self, p: &Pasture) -> u32 {
         let stables = p.cells.iter().filter(|&&i| self.farm[i].stable).count();
         (2 * p.cells.len() as u32)

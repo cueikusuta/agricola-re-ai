@@ -1,7 +1,7 @@
 //! Cross-deck preset card pools (M6/M7 starter & shared verified sets).
 use super::{
-    CardDefinition, CardEffect, CardKind, CardRequirement, HarvestFieldRule, PassiveRule,
-    ScoreBonusRule, StablePlacementScope,
+    CardDefinition, CardEffect, CardKind, CardRequirement, ExchangeResource, HarvestFieldRule,
+    PassiveRule, ScoreBonusRule, StablePlacementScope,
 };
 use crate::model::{Animal, Crop, Good, House, Space};
 
@@ -2716,5 +2716,157 @@ mod m6_extra_passive_tests {
         )
         .unwrap();
         assert_eq!(p.stone_cost_discount, 1);
+    }
+}
+
+/// On-play exchange cards (A036 ファサード彫刻 / D009 獲物の交換) — implemented but not in the 2-player
+/// verified preset per task constraints (verified_basic_card_set / MCTS digest unchanged).
+pub fn verified_exchange_cards() -> Vec<CardDefinition> {
+    vec![
+        // A036 ファサード彫刻 (Facades Carving): on play, optionally exchange food for points,
+        // capped at the number of completed harvests. Cost: 2 clay.
+        CardDefinition {
+            use_limit: None,
+            id: "A036".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Clay, 2)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayExchange {
+                give: vec![ExchangeResource::Good(Good::Food)],
+                receive: vec![ExchangeResource::Points],
+                give_is_cost: false,
+                optional: true,
+                // The cap is dynamic (completed harvests at play time), so it
+                // stays None here: the handler derives it from
+                // DispatchContext.round + model::HARVEST_ROUNDS
+                // (card_events::handle_on_play_exchange) — no new saved field.
+                cap: None,
+            }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // D009 獲物の交換 (Game Trade): on play, exchange 2 sheep for 1 boar + 1 cattle.
+        // Prerequisite: 2 sheep (cost is animal, not good).
+        CardDefinition {
+            use_limit: None,
+            id: "D009".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumAnimals {
+                        animal: Animal::Sheep,
+                        number: 2,
+                    },
+                },
+                CardEffect::OnPlayExchange {
+                    give: vec![
+                        ExchangeResource::Animal(Animal::Sheep),
+                        ExchangeResource::Animal(Animal::Sheep),
+                    ],
+                    receive: vec![
+                        ExchangeResource::Animal(Animal::Boar),
+                        ExchangeResource::Animal(Animal::Cattle),
+                    ],
+                    give_is_cost: false,
+                    optional: false,
+                    cap: None,
+                },
+            ],
+            post_play: crate::cards::PostPlayDestination::LeftNeighborHand,
+        },
+    ]
+}
+
+#[cfg(test)]
+mod verified_exchange_card_tests {
+    use super::super::*;
+
+    fn play_card(id: &str, player: &mut Player) -> Result<(), String> {
+        let set = CardSet {
+            definitions: verified_exchange_cards(),
+        };
+        let mut hand = vec![id.to_string()];
+        let kind = set.definition(id).unwrap().kind;
+        play(&set, &mut hand, player, id, kind, 0)
+    }
+
+    /// The LEGACY `cards::play` projection resolves exactly ONE exchange unit
+    /// for one food → one point. The name says what this test really pins: the
+    /// completed-harvest cap and the variable exchange amount are NOT visible
+    /// here (this path cannot see the dispatch round), so they stay covered by
+    /// the production dispatcher contract tests in
+    /// `tests/ch06_onplay_exchange.rs` (A036-capped at round 8, A036-normal at
+    /// round 14, round 2 cap 0 — Round 1 review P1-2).
+    #[test]
+    fn a036_legacy_projection_exchanges_one_food_for_one_point() {
+        let mut player = Player::new(0, 0);
+        player.supply.clay = 2; // cost
+        player.supply.food = 5;
+        play_card("A036", &mut player).unwrap();
+        // Cost: 2 clay
+        assert_eq!(player.supply.clay, 0);
+        // Legacy projection: this hand-less path resolves exactly ONE exchange
+        // unit and cannot see the dispatch round, so neither the variable
+        // amount nor the dynamic completed-harvest cap applies here. The real
+        // amounts (round 14 -> 5, round 8 -> 2, round 2 -> 0) are pinned on
+        // the production dispatcher path in tests/ch06_onplay_exchange.rs
+        // (Round 1 review P1-2).
+        assert_eq!(player.supply.food, 4, "food_delta -1 (legacy: one unit)");
+        assert_eq!(player.card_points, 1, "points_delta +1 (legacy: one unit)");
+        assert_eq!(player.played_cards, vec!["A036"]);
+    }
+
+    #[test]
+    fn a036_cannot_play_without_clay() {
+        let mut player = Player::new(0, 0);
+        player.supply.food = 5;
+        let old = player.clone();
+        assert!(play_card("A036", &mut player).is_err());
+        assert_eq!(player, old);
+    }
+
+    #[test]
+    fn d009_exchanges_sheep_for_boar_and_cattle() {
+        let mut player = Player::new(0, 0);
+        // 2 sheep in a real pasture; two empty stables receive the boar and
+        // cattle. Animals are placed through the canonical placement vocabulary
+        // (auto_animal_plan + engine::place_animals), never by manufacturing a
+        // cell-less pasture (Round 1 review P2).
+        player.pastures.push(crate::model::Pasture {
+            id: 1,
+            cells: vec![0, 1],
+            animal: Some(Animal::Sheep),
+            quantity: 2,
+        });
+        player.farm[2].stable = true;
+        player.farm[3].stable = true;
+        assert_eq!(player.animal_count(Animal::Sheep), 2);
+        play_card("D009", &mut player).unwrap();
+        // Prerequisite: 2 sheep (consumed by exchange, one 2-sheep price)
+        assert_eq!(player.animal_count(Animal::Sheep), 0);
+        // Receive: 1 boar + 1 cattle
+        assert_eq!(player.animal_count(Animal::Boar), 1);
+        assert_eq!(player.animal_count(Animal::Cattle), 1);
+        assert_eq!(player.played_cards, vec!["D009"]);
+    }
+
+    #[test]
+    fn d009_cannot_play_without_sheep() {
+        let mut player = Player::new(0, 0);
+        let old = player.clone();
+        assert!(play_card("D009", &mut player).is_err());
+        assert_eq!(player, old);
+    }
+
+    /// Task constraint: the exchange cards live in their own pool and stay OUT
+    /// of `verified_basic_card_set` (the 2-player preset), so the preset card
+    /// count and the MCTS content-hash digest are unchanged by this PR.
+    #[test]
+    fn exchange_cards_are_absent_from_the_two_player_preset() {
+        let preset = verified_basic_card_set(2).unwrap();
+        assert!(preset.definition("A036").is_none());
+        assert!(preset.definition("D009").is_none());
+        assert!(verified_basic_card_set(3).is_err());
     }
 }

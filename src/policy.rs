@@ -694,19 +694,33 @@ fn card_priority(
                                                                 CardEffect::HarvestFieldOptionalExchange { gain, gain_amount, .. } => {
                                                                                                                                     card_good_value(*gain) * i64::from(*gain_amount) * horizon / 2
                                                                                                                                 }
-                                                                                                                                // harvest_feeding automatic gains (D012): fixed per-harvest grant
+                                                                                                                                // OnPlayExchange (A036/D009): value the receive resources.
+                                                                // A036: food -> points (1 point ≈ 1 food value).
+                                                                // D009: sheep -> boar + cattle (1 boar + 1 cattle ≈ 2 sheep value).
+                                                                CardEffect::OnPlayExchange { receive, .. } => {
+                                                                    receive
+                                                                        .iter()
+                                                                        .map(|res| match res {
+                                                                            crate::cards::ExchangeResource::Good(g) => card_good_value(*g),
+                                                                            crate::cards::ExchangeResource::Animal(a) => card_animal_value(*a),
+                                                                            crate::cards::ExchangeResource::Points => 1, // 1 point ≈ 1 food value
+                                                                        })
+                                                                        .sum::<i64>()
+                                                                        * horizon
+                                                                }
+                                                                // harvest_feeding automatic gains (D012): fixed per-harvest grant
                                                                                                                                 CardEffect::HarvestFeedingGain { good, amount, .. } => {
                                                                                                                                     let good_val = good.map(card_good_value).unwrap_or(0);
                                                                                                                                     good_val * i64::from(*amount) * horizon
                                                                                                                                 }
                                                                                                                                 // harvest_feeding optional exchanges (A062, C055, C059, C063, D062, D084): plan-driven, conditional
-                                                                CardEffect::HarvestFeedingOptionalExchange { options, .. } => {
-                                                                    let max_food = options.iter().map(|o| o.receive_food).max().unwrap_or(0);
-                                                                    let max_points = options.iter().map(|o| o.receive_points).max().unwrap_or(0);
-                                                                    let has_animal = options.iter().any(|o| o.receive_animal);
-                                                                    let animal_val = if has_animal { card_animal_value(Animal::Sheep) } else { 0 };
-                                                                    (card_good_value(Good::Food) * i64::from(max_food) + animal_val + i64::from(max_points)) * horizon / 2
-                                                                }
+                                                                                                                                CardEffect::HarvestFeedingOptionalExchange { options, .. } => {
+                                                                                                                                    let max_food = options.iter().map(|o| o.receive_food).max().unwrap_or(0);
+                                                                                                                                    let max_points = options.iter().map(|o| o.receive_points).max().unwrap_or(0);
+                                                                                                                                    let has_animal = options.iter().any(|o| o.receive_animal);
+                                                                                                                                    let animal_val = if has_animal { card_animal_value(Animal::Sheep) } else { 0 };
+                                                                                                                                    (card_good_value(Good::Food) * i64::from(max_food) + animal_val + i64::from(max_points)) * horizon / 2
+                                                                                                                                }
                                                                 // New variants for market followup cards (PR #393)
                                 CardEffect::AfterAnyWorkerGain { good, amount, .. }
                                 | CardEffect::AfterAnyWorkerOthersGain { good, amount, .. } => {

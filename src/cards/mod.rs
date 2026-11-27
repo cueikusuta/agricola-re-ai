@@ -646,6 +646,28 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// On-play resource exchange: deduct `give` resources and grant `receive` resources.
+    /// Used for A036 ファサード彫刻 (food -> points, capped), D009 獲物の交換
+    /// (sheep -> boar + cattle).
+    /// If `give_is_cost` is true, the `give` resources are assumed to have been paid as the card's play cost
+    /// and are not deducted again. If false, `give` is deducted now.
+    /// `cap` limits the exchange amount for optional variable exchanges (A036: completed harvests).
+    OnPlayExchange {
+        give: Vec<ExchangeResource>,
+        receive: Vec<ExchangeResource>,
+        give_is_cost: bool,
+        optional: bool,
+        cap: Option<u32>,
+    },
+}
+
+/// Resource type for on-play exchange effects. Can represent goods, animals, or points.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExchangeResource {
+    Good(Good),
+    Animal(Animal),
+    Points,
 }
 
 /// One printed option of a harvest-feeding owner-chosen exchange.
@@ -739,6 +761,7 @@ impl CardEffect {
                 "on_play_gain_by_hand_occupation_count"
             }
             CardEffect::OnPlayExchangeGain { .. } => "on_play_exchange_gain",
+            CardEffect::OnPlayExchange { .. } => "on_play_exchange",
             CardEffect::OnPlayGainOrExchangeAnimal { .. } => "on_play_gain_or_exchange_animal",
             CardEffect::AfterImprovementPlayedGain { .. } => "after_improvement_played_gain",
             CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { .. } => {
@@ -1195,6 +1218,10 @@ impl CardSet {
                             receive_amount,
                             ..
                         } => (*give_amount).max(*receive_amount),
+                        CardEffect::OnPlayExchange { receive, .. } => {
+                            // Each receive resource represents 1 unit; validate count
+                            receive.len().max(1) as u32
+                        }
                         CardEffect::OnPlayGainOrExchangeAnimal {
                             gain_amount,
                             pay_amount,
@@ -1952,7 +1979,102 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                     safe_gain(player, *receive, *receive_amount)?;
                 }
             }
-            // B009 むち (Beating Rod): gain, or pay to gain one animal.
+            // A036 ファサード彫刻 / D009 獲物の交換: on-play exchange (simplified
+            // legacy path). For give_is_cost=true, the cost was already paid;
+            // just grant receive. For give_is_cost=false, deduct give and
+            // grant receive (A036). This projection mirrors the production
+            // handler's unit arithmetic: the give bundle lists one entry per
+            // unit of each resource one exchange costs, so duplicate entries
+            // multiply the price (D009 pays [Sheep, Sheep] = 2 sheep per
+            // unit), and each distinct resource is paid once per unit.
+            // Optional exchanges with nothing to pay are skipped. `cap`
+            // limits the units when a static cap is printed; A036's completed-
+            // harvest cap needs the round, which this hand-less projection
+            // cannot see (the production path derives it from
+            // DispatchContext.round + HARVEST_ROUNDS), so a dynamic cap is
+            // treated as unbounded here — Round 1 P1-4 tail, dispatcher
+            // contract tests in tests/ch06_onplay_exchange.rs.
+            CardEffect::OnPlayExchange {
+                give,
+                receive,
+                give_is_cost,
+                optional,
+                cap,
+            } => {
+                // Units limited by every distinct give resource.
+                let mut units: u32 = 1;
+                let mut settled: Vec<ExchangeResource> = Vec::new();
+                for give_res in give {
+                    if settled.contains(give_res) {
+                        continue;
+                    }
+                    settled.push(*give_res);
+                    let per_unit = give.iter().filter(|other| *other == give_res).count() as u32;
+                    let available = match give_res {
+                        ExchangeResource::Good(g) => player.supply.get(*g),
+                        ExchangeResource::Animal(a) => player.animal_count(*a),
+                        ExchangeResource::Points => u32::MAX, // never held
+                    };
+                    units = units.min(available / per_unit.max(1));
+                }
+                if let Some(cap) = cap {
+                    units = units.min(*cap);
+                }
+                if units == 0 {
+                    if !optional {
+                        return Err("not enough resources to exchange".into());
+                    }
+                    continue;
+                }
+                if !give_is_cost {
+                    // Deduct give resources (each DISTINCT resource once — the
+                    // duplicate [Sheep, Sheep] entries are one 2-sheep price).
+                    let mut settled: Vec<ExchangeResource> = Vec::new();
+                    for give_res in give {
+                        if settled.contains(give_res) {
+                            continue;
+                        }
+                        settled.push(*give_res);
+                        let per_unit =
+                            give.iter().filter(|other| *other == give_res).count() as u32;
+                        let total_give = per_unit.checked_mul(units).ok_or("exchange overflow")?;
+                        match give_res {
+                            ExchangeResource::Good(g) => {
+                                player.supply.pay(*g, total_give)?;
+                            }
+                            ExchangeResource::Animal(a) => {
+                                player.remove_animals(*a, total_give)?;
+                            }
+                            ExchangeResource::Points => {}
+                        }
+                    }
+                }
+                // Grant receive resources
+                for receive_res in receive {
+                    match receive_res {
+                        ExchangeResource::Good(g) => {
+                            let next = player
+                                .supply
+                                .get(*g)
+                                .checked_add(units)
+                                .ok_or("resource overflow")?;
+                            player.supply.set(*g, next);
+                        }
+                        ExchangeResource::Animal(a) => {
+                            let plan = crate::card_events::auto_animal_plan(player, *a, units);
+                            crate::engine::place_animals(player, &plan, units).map_err(|e| {
+                                format!("on-play exchange animal placement failed: {e}")
+                            })?;
+                        }
+                        ExchangeResource::Points => {
+                            player.card_points = player
+                                .card_points
+                                .checked_add(units as i32)
+                                .ok_or("card points overflow")?;
+                        }
+                    }
+                }
+            } // B009 むち (Beating Rod): gain, or pay to gain one animal.
             // Deterministic policy: exchange whenever the payment resource is
             // available; the animal is placed through the derived plan (same
             // vocabulary as OnPlayGainAnimal, overflow discarded).

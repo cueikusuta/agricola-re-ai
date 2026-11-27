@@ -339,6 +339,7 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainIfRoomCount { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
                 | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+| crate::cards::CardEffect::OnPlayExchange { .. }
                 // B-deck on-play chapter 1
                 | crate::cards::CardEffect::OnPlayBuildPasture { .. }
                 | crate::cards::CardEffect::OnPlayDrawPlayOrPassOccupation { .. }
@@ -580,6 +581,10 @@ impl CardRegistryBuilder {
                             gain_amount,
                             ..
                         } => *gain_amount,
+                        crate::cards::CardEffect::OnPlayExchange { receive, .. } => {
+                            // Each receive resource represents 1 unit; validate count
+                            receive.len().max(1) as u32
+                        }
                         crate::cards::CardEffect::OnPlayGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
