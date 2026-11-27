@@ -23,6 +23,8 @@
 
 18. **PR検証のActions逃がし（2026-11-17）**：PR作成時の検証はGitHub Actionsを主体とし、ローカル実行は対象を絞る。ワーカーは `cargo fmt --check` / `cargo clippy --all-targets --all-features --locked -- -D warnings` と、自分が追加・変更したテスト（`cargo test --lib <カードID または 変更モジュール>`）のみをローカルで実行する。プール数・MCTSダイジェストを動かした場合に限り `cargo test --test m6_verified_pool` と `cargo test --lib mcts::tests::sample_game_distribution_digest_is_stable` を追加で実行する。**`cargo test --locked` の全件実行はローカルの必須手順としない** — `ci.yml` の `cargo test` ジョブ（nextest `--release --locked --all-targets`）が全PRで全件を実行し、`pipeline-gates.yml` が仕様・台帳・ブロッカーのPythonゲート3本を全PRで実行する。PR本文のゲート欄にはローカル測定値ではなく**Actionsのチェック名・結論・run URL**を記録する。レビューとマージの判断も同じくActionsのチェック状態（review対象HEAD SHAの check-runs）を根拠とし、レビュー時のローカル全件再実行は行わない。Actionsが赤い場合は失敗ジョブのログをrun URLから読んで原因を直し、pushする。詳細は `docs/ci-performance.md` の「PR検証のActions逃がし」節。`Mode-wide Simulator Verification` / `G0 gate` などmain統合時の大量検証の扱いは第13項（[`docs/agents/ai-experiments.md`](docs/agents/ai-experiments.md)）のまま変更しない。
 
+19. **カード実装供給・レビュー・作業単位の運用方針（Issue #530）**：詳細は [`docs/agents/operations-policy.md`](docs/agents/operations-policy.md) を参照。新規のカード実装 Issue・Kanban カードは仕組み単位の複数カードバッチを既定とし、**1枚だけの実装カードを新規に切らない**（即時適用）。補充・優先順位・復帰の決定スクリプト化と、仕様・テスト契約・CI を主役にするレビューへの移行は別セッションで実施する。移行が統合されるまでは現行の独立レビューとマージゲートを維持する。
+
 ## 役割別規約
 
 - AI実験・大量試合運用（第10〜13項）：[`docs/agents/ai-experiments.md`](docs/agents/ai-experiments.md)
