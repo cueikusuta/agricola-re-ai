@@ -1435,12 +1435,21 @@ impl Game {
         if p.finished && (p.round != 14 || p.workers_placed != p.work_quota) {
             return Err("game ended before all workers were placed".into());
         }
-        if p.used.len()
-            != p.workers_placed
-                .iter()
-                .map(|&n| usize::from(n))
-                .sum::<usize>()
-        {
+        // A025 Bassinet / A026 Sleeping Corner re-entry: two workers may
+        // share one already-used space, so the placement total can exceed
+        // `used.len()` by the shared entries recorded in `space_occupants`.
+        // The incremental validator proves exactly this case legal, and its
+        // soundness contract forbids `validate_full` from rejecting a state
+        // it passes. Saves written before the occupancy map existed carry
+        // none, so the strict count stands for them.
+        let placed: usize = p.workers_placed.iter().map(|&n| usize::from(n)).sum();
+        let occupants: usize = p.space_occupants.values().map(|&n| usize::from(n)).sum();
+        let placements_ok = if p.space_occupants.is_empty() {
+            p.used.len() == placed
+        } else {
+            occupants == placed && p.used.len() <= placed
+        };
+        if !placements_ok {
             return Err("worker placements do not match used spaces".into());
         }
         let all_cards = p
@@ -2483,13 +2492,21 @@ pub fn validate_search_public(
     if public.finished && (public.round != 14 || public.workers_placed != public.work_quota) {
         return Err("game ended before all workers were placed".into());
     }
-    if public.used.len()
-        != public
-            .workers_placed
-            .iter()
-            .map(|&n| usize::from(n))
-            .sum::<usize>()
-    {
+    // Same shared-space rule as `Game::validate` (see the comment there):
+    // an occupancy record makes the placement count authoritative, while
+    // legacy states without one keep the strict `used.len()` count.
+    let placed: usize = public.workers_placed.iter().map(|&n| usize::from(n)).sum();
+    let occupants: usize = public
+        .space_occupants
+        .values()
+        .map(|&n| usize::from(n))
+        .sum();
+    let placements_ok = if public.space_occupants.is_empty() {
+        public.used.len() == placed
+    } else {
+        occupants == placed && public.used.len() <= placed
+    };
+    if !placements_ok {
         return Err("worker placements do not match used spaces".into());
     }
 

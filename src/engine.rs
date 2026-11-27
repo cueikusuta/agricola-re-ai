@@ -3573,7 +3573,7 @@ mod m6_extra_passive_engine_tests {
 #[cfg(test)]
 mod grow_with_minor_regression_tests {
     use super::*;
-    use crate::cards::{play, verified_basic_card_set, CardKind};
+    use crate::cards::{play, verified_basic_card_set, CardDefinition, CardKind};
     use crate::model::{Config, RoundCard, Space};
 
     fn setup_game_with_fgwr() -> (Game, usize) {
@@ -4232,6 +4232,13 @@ mod grow_with_minor_regression_tests {
         p.farm[8].tile = Tile::Pasture { id: 2 };
         assert_eq!(p.homekeeper_extra_capacity(), 1); // still exactly one room counted
 
+        // A085-not-triggered contract: a clay room touching a field but no
+        // pasture grants nothing — the negative case a wooden house alone
+        // does not cover.
+        p.farm[2].tile = Tile::Empty;
+        p.farm[8].tile = Tile::Empty;
+        assert_eq!(p.homekeeper_extra_capacity(), 0);
+
         // Engine path: rooms == family, no spare room -> Homekeeper makes the
         // difference. Cell 1's neighbors are [0, 2, 6]: field at 0, pasture at 2.
         let set = verified_basic_card_set(2).unwrap();
@@ -4356,6 +4363,436 @@ mod grow_with_minor_regression_tests {
         let p0 = &mut game2.public.players[0];
         assert_eq!(p0.house, House::Clay);
         assert_eq!(p0.supply.clay, 0);
+    }
+
+    /// A026 contract (A026-not-triggered): Sleeping Corner covers only the
+    /// Wish-for-Children space. An occupied Farmland stays closed even to the
+    /// card owner, so the contract's negative setup is instantiated directly.
+    #[test]
+    fn a026_sleeping_corner_engine_occupied_farmland_stays_closed() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 59,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .unwrap();
+        game.public.players[0].played_cards.push("A026".to_string());
+
+        // Opponent occupies Farmland (plow) with exactly one person.
+        game.public.active_player = 1;
+        assert!(game
+            .apply(Action {
+                space: Space::Farmland,
+                detail: Detail::Plow { cell: 4 },
+            })
+            .is_ok());
+        assert_eq!(
+            game.public.space_occupants.get(&Space::Farmland).copied(),
+            Some(1)
+        );
+
+        // A026 does not extend to Farmland, so the owner cannot share it.
+        game.public.active_player = 0;
+        assert!(!game.legal_spaces().contains(&Space::Farmland));
+        assert!(game
+            .apply(Action {
+                space: Space::Farmland,
+                detail: Detail::Plow { cell: 6 },
+            })
+            .is_err());
+    }
+
+    /// A025 contract (A025-normal / A025-crowded): the Bassinet target is the
+    /// Farmland space itself. Used first this work phase and occupied by
+    /// exactly one other player, the owner may share it; occupied by two, the
+    /// space stays closed even for a player whose Bassinet is still unused.
+    #[test]
+    fn a025_bassinet_engine_farmland_contract_shared_or_crowded() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 31,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .unwrap();
+        // Both seats hold the Bassinet, so the crowded half proves the refusal
+        // comes from the occupant count and not from a missing card.
+        game.public.players[0].played_cards.push("A025".to_string());
+        game.public.players[1].played_cards.push("A025".to_string());
+
+        // The opponent uses Farmland FIRST: it becomes the chronologically
+        // first non-accumulating space, occupied by exactly one player.
+        game.public.active_player = 1;
+        assert!(game
+            .apply(Action {
+                space: Space::Farmland,
+                detail: Detail::Plow { cell: 1 },
+            })
+            .is_ok());
+        assert_eq!(
+            game.public.first_non_accum_space_used,
+            Some(Space::Farmland)
+        );
+        assert_eq!(
+            game.public.space_occupants.get(&Space::Farmland).copied(),
+            Some(1)
+        );
+
+        // A025-normal: the owner may enter that exactly-once-occupied space.
+        game.public.active_player = 0;
+        assert!(game.legal_spaces().contains(&Space::Farmland));
+        assert!(game
+            .apply(Action {
+                space: Space::Farmland,
+                detail: Detail::Plow { cell: 2 },
+            })
+            .is_ok());
+        assert!(game.public.players[0].bassinet_first_occupied_used);
+        assert_eq!(
+            game.public.space_occupants.get(&Space::Farmland).copied(),
+            Some(2)
+        );
+
+        // A025-crowded: with two occupants the space is no longer shareable.
+        // The opponent's second worker is refused and nothing changes.
+        game.public.active_player = 1;
+        assert!(!game.legal_spaces().contains(&Space::Farmland));
+        assert!(game
+            .apply(Action {
+                space: Space::Farmland,
+                detail: Detail::Plow { cell: 3 },
+            })
+            .is_err());
+        assert!(!game.public.players[1].bassinet_first_occupied_used);
+        assert_eq!(
+            game.public.space_occupants.get(&Space::Farmland).copied(),
+            Some(2)
+        );
+        assert!(matches!(game.public.players[1].farm[3].tile, Tile::Empty));
+    }
+
+    /// A087 contract (A087-boundary): Conservator skips the clay stage, but the
+    /// usual stone renovation cost still applies. The contract's implied house
+    /// has three rooms (three stone), so two stone are refused and nothing is
+    /// spent; three stone complete the direct wood-to-stone move.
+    #[test]
+    fn a087_conservator_engine_three_room_stone_cost_boundary() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 43,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .unwrap();
+        // Play the occupation through the engine so has_conservator is set by
+        // the passive handler, not by hand.
+        if !game.cards.hands[0].iter().any(|id| id == "A087") {
+            game.cards.hands[0].push("A087".to_string());
+        }
+        game.cards.undealt.retain(|id| id != "A087");
+        for hand in game.cards.hands.iter_mut().skip(1) {
+            hand.retain(|id| id != "A087");
+        }
+        game.public.active_player = 0;
+        game.public.revealed.push(RoundCard::HouseRedevelopment);
+        game.apply(Action {
+            space: Space::Lessons,
+            detail: Detail::PlayOccupation {
+                card_id: "A087".to_string(),
+            },
+        })
+        .unwrap();
+        assert!(game.public.players[0].has_conservator);
+
+        // Grow the wooden house to three rooms: cell 10 touches the room at 5.
+        game.public.players[0].farm[10].tile = Tile::Room;
+        assert_eq!(game.public.players[0].rooms(), 3);
+
+        let renovate = Action {
+            space: Space::HouseRedevelopment,
+            detail: Detail::Renovate {
+                bonus_improvement: None,
+                instant_bake: 0,
+                pastures: vec![],
+            },
+        };
+
+        // A087-boundary: two stone cannot pay the three-stone cost.
+        game.public.players[0].supply.stone = 2;
+        game.public.players[0].supply.reed = 1;
+        game.public.active_player = 0;
+        assert!(!game.legal_spaces().contains(&Space::HouseRedevelopment));
+        assert!(game.apply(renovate.clone()).is_err());
+        assert_eq!(game.public.players[0].house, House::Wood);
+        assert_eq!(game.public.players[0].supply.stone, 2);
+        assert_eq!(game.public.players[0].supply.reed, 1);
+
+        // A087-normal: three stone pay the cost and the house jumps to stone.
+        game.public.players[0].supply.stone = 3;
+        game.public.active_player = 0;
+        assert!(game.legal_spaces().contains(&Space::HouseRedevelopment));
+        game.apply(renovate).unwrap();
+        assert_eq!(game.public.players[0].house, House::Stone);
+        assert_eq!(game.public.players[0].supply.stone, 0);
+        assert_eq!(game.public.players[0].supply.reed, 0);
+    }
+
+    /// A087 contract (A087-not-triggered): without the occupation the wooden
+    /// house can only reach clay, so the wood-to-stone move stays illegal even
+    /// with stone and reed in supply — nothing is paid and the house stays
+    /// wooden.
+    #[test]
+    fn a087_conservator_engine_without_card_stone_move_stays_illegal() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 47,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .unwrap();
+        game.public.active_player = 0;
+        game.public.revealed.push(RoundCard::HouseRedevelopment);
+        {
+            let p0 = &mut game.public.players[0];
+            assert!(!p0.has_conservator);
+            p0.supply.stone = 3;
+            p0.supply.reed = 1;
+            // No clay: the only legal target without Conservator is unaffordable.
+            p0.supply.clay = 0;
+        }
+        let renovate = Action {
+            space: Space::HouseRedevelopment,
+            detail: Detail::Renovate {
+                bonus_improvement: None,
+                instant_bake: 0,
+                pastures: vec![],
+            },
+        };
+        assert!(!game.legal_spaces().contains(&Space::HouseRedevelopment));
+        assert!(game.apply(renovate).is_err());
+        assert_eq!(game.public.players[0].house, House::Wood);
+        assert_eq!(game.public.players[0].supply.stone, 3);
+        assert_eq!(game.public.players[0].supply.reed, 1);
+    }
+
+    /// A025 contract (saved replay): the chronological first-space record and
+    /// the once-per-round consumption survive a save/load round trip, so a
+    /// resumed game allows exactly the same shared entry — and no more.
+    ///
+    /// The game is three-player on purpose: with two players the share is
+    /// always the round's last placement, the round would advance and clear
+    /// the per-round flag, and no mid-round save of a consumed flag could
+    /// exist. Every state change is an engine action, because
+    /// `Game::load_json` replays the recorded event log and rejects
+    /// hand-edited public state.
+    #[test]
+    fn a025_bassinet_engine_first_space_and_once_survive_save_load() {
+        // Pad the A/B pool with never-played filler cards so a three-player
+        // set validates (the built-in pool is authored for two players).
+        let mut set = verified_basic_card_set(2).unwrap();
+        let mut filler = 0usize;
+        for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
+            while set.definitions.iter().filter(|c| c.kind == kind).count() < 21 {
+                filler += 1;
+                set.definitions.push(CardDefinition {
+                    use_limit: None,
+                    id: format!("filler_{filler}"),
+                    kind,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![],
+                });
+            }
+        }
+        set.validate(3).unwrap();
+
+        // Explicit hands (recorded as `initial_hands`, so the load-time replay
+        // rebuilds the exact deal): seat 1 holds A025 and starts every round.
+        let mut minors: Vec<String> = set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::MinorImprovement)
+            .map(|c| c.id.clone())
+            .collect();
+        minors.retain(|id| id != "A025");
+        let mut seat_minors: Vec<Vec<String>> = vec![Vec::new(), Vec::new(), Vec::new()];
+        seat_minors[1].push("A025".to_string());
+        seat_minors[1].extend(minors.drain(..6));
+        seat_minors[0].extend(minors.drain(..7));
+        seat_minors[2].extend(minors.drain(..7));
+        let mut occupations: Vec<String> = set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::Occupation)
+            .map(|c| c.id.clone())
+            .collect();
+        let mut seat_occupations: Vec<Vec<String>> = Vec::new();
+        for _ in 0..3 {
+            seat_occupations.push(occupations.drain(..7).collect());
+        }
+        let hands: Vec<Vec<String>> = (0..3)
+            .map(|seat| {
+                let mut hand = seat_occupations[seat].clone();
+                hand.extend(seat_minors[seat].clone());
+                hand
+            })
+            .collect();
+        let mut game = Game::with_cards_and_hands_with_start_player(
+            Config {
+                players: 3,
+                seed: 67,
+                additional_action_space_enabled: false,
+            },
+            set,
+            hands,
+            1,
+        )
+        .unwrap();
+
+        // Round 1: the sharing seat gathers the A025 cost through ordinary
+        // worker actions (Forest 3 wood, ReedBank 1 reed).
+        game.apply(Action {
+            space: Space::Forest,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 1
+        game.apply(Action {
+            space: Space::GrainSeeds,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 2
+        game.apply(Action {
+            space: Space::Fishing,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 0
+        game.apply(Action {
+            space: Space::ReedBank,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 1
+        game.apply(Action {
+            space: Space::ClayPit,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 2
+        game.apply(Action {
+            space: Space::DayLaborer,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 0
+        assert_eq!(game.public.round, 2);
+
+        // Round 2: seat 1 plays A025 through the engine (MeetingPlace plays
+        // minor improvements) using the resources gathered in round 1.
+        game.apply(Action {
+            space: Space::MeetingPlace,
+            detail: Detail::PlayMinor {
+                card_id: "A025".to_string(),
+            },
+        })
+        .unwrap(); // seat 1
+        game.apply(Action {
+            space: Space::GrainSeeds,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 2
+        game.apply(Action {
+            space: Space::Fishing,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 0
+        game.apply(Action {
+            space: Space::Forest,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 1
+        game.apply(Action {
+            space: Space::ClayPit,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 2
+        game.apply(Action {
+            space: Space::DayLaborer,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 0
+        assert_eq!(game.public.round, 3);
+        assert!(game.public.players[1]
+            .played_cards
+            .contains(&"A025".to_string()));
+
+        // Round 3: seat 1 opens with an accumulating space (no first-space
+        // record), then seat 2 takes GrainSeeds — the chronologically first
+        // non-accumulating space, occupied by exactly one other player.
+        game.apply(Action {
+            space: Space::Fishing,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 1
+        game.apply(Action {
+            space: Space::GrainSeeds,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 2
+        assert_eq!(
+            game.public.first_non_accum_space_used,
+            Some(Space::GrainSeeds)
+        );
+        game.apply(Action {
+            space: Space::ClayPit,
+            detail: Detail::None,
+        })
+        .unwrap(); // seat 0
+
+        // Mid-round save: the first-space record and the still-unconsumed
+        // once flag are part of the public state the canonical save writes.
+        let json = game.save_json().unwrap();
+        let mut restored = Game::load_json(&json).unwrap();
+        assert_eq!(
+            restored.public.first_non_accum_space_used,
+            Some(Space::GrainSeeds)
+        );
+        assert!(!restored.public.players[1].bassinet_first_occupied_used);
+        assert!(restored.public.players[1]
+            .played_cards
+            .contains(&"A025".to_string()));
+
+        // Seat 1 shares the occupied GrainSeeds space: this consumes the
+        // once-per-round ability while seats 0 and 2 keep a worker unused, so
+        // the round does not advance and the flag stays observable.
+        assert!(restored.legal_spaces().contains(&Space::GrainSeeds));
+        restored
+            .apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .unwrap();
+        assert!(restored.public.players[1].bassinet_first_occupied_used);
+        assert_eq!(restored.public.round, 3);
+
+        // A second save/load still carries the consumed flag and the record.
+        let mut reloaded = Game::load_json(&restored.save_json().unwrap()).unwrap();
+        assert_eq!(
+            reloaded.public.first_non_accum_space_used,
+            Some(Space::GrainSeeds)
+        );
+        assert!(reloaded.public.players[1].bassinet_first_occupied_used);
+        reloaded.public.active_player = 1;
+        assert!(!reloaded.legal_spaces().contains(&Space::GrainSeeds));
     }
 
     #[test]
