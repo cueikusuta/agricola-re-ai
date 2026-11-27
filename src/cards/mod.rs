@@ -87,6 +87,16 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// B132 地主 (Estate Master): at each harvest field phase, if every
+    /// farmyard space is used, gain `points_per_vegetable` bonus points per
+    /// vegetable harvested this field phase (one per growing vegetable field
+    /// at field-phase start, before crops are removed). Points accumulate in
+    /// `Player::bonus_points` and count at final scoring; `card_points`
+    /// (printed points only) is deliberately untouched because it must always
+    /// equal the sum of printed points of played cards.
+    HarvestFieldGainPointsIfFarmyardFull {
+        points_per_vegetable: u32,
+    },
     AfterWorkerGainIfUsed {
         space: Space,
         required_space: Space,
@@ -670,6 +680,9 @@ impl CardEffect {
             CardEffect::OnPlayGainIfHouse { .. } => "on_play_gain_if_house",
             CardEffect::StartRoundGain { .. } => "start_round_gain",
             CardEffect::HarvestFieldGain { .. } => "harvest_field_gain",
+            CardEffect::HarvestFieldGainPointsIfFarmyardFull { .. } => {
+                "harvest_field_points_if_farmyard_full"
+            }
             CardEffect::AfterWorkerGainIfUsed { .. } => "after_worker_gain_if_used",
             CardEffect::Passive { .. } => "passive",
             CardEffect::AfterClayConstructionGain { .. } => "after_clay_construction_gain",
@@ -1198,6 +1211,8 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
                         | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
                         | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 1,
+                        // B132: no good-amount to validate (points only)
+                        CardEffect::HarvestFieldGainPointsIfFarmyardFull { .. } => 1,
                         CardEffect::AfterWorkerSpaceImprovementAction { .. }
                         | CardEffect::AfterWorkerSpaceBakeBread { .. } => 1,
                         CardEffect::HarvestFeedingGain { amount, .. } => *amount,
@@ -2064,6 +2079,17 @@ pub fn after_worker(set: &CardSet, player: &mut Player, space: Space) -> Result<
     Ok(())
 }
 
+/// Every farmyard space is used: a farm cell counts as used when it carries a
+/// non-`Empty` tile or a stable is built on it (a stable on an empty space is
+/// occupied by the stable, so it is not unused). Shared by `E034 登記簿`'s
+/// end-game bonus and `B132 地主`'s harvest-field bonus.
+pub fn farmyard_all_used(player: &Player) -> bool {
+    player
+        .farm
+        .iter()
+        .all(|cell| !matches!(cell.tile, Tile::Empty) || cell.stable)
+}
+
 /// Calculated at read time from public played cards; it is never added to the
 /// immutable printed-points counter and therefore cannot be counted twice.
 pub fn end_game_bonus(set: &CardSet, player: &Player) -> i32 {
@@ -2201,15 +2227,7 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                     }
                 }
                 ScoreBonusRule::FarmyardAllUsed => {
-                    // A farm cell counts as used when it carries a non-Empty
-                    // tile or a stable is built on it: a stable-on-empty space
-                    // (tile Empty, stable true) is occupied by the stable, so
-                    // it must not be counted as unused.
-                    let all_used = player
-                        .farm
-                        .iter()
-                        .all(|cell| !matches!(cell.tile, Tile::Empty) || cell.stable);
-                    if all_used {
+                    if farmyard_all_used(player) {
                         2
                     } else {
                         0
@@ -2495,8 +2513,9 @@ pub fn start_round_rewards(set: &CardSet, player: &mut Player) -> Result<(), Str
 
 /// Vegetables the field phase is about to yield: one per planted vegetable
 /// field whose crop is still growing (each yields exactly one per harvest).
-/// Read pre-harvest state, before any crops are removed.
-fn vegetable_yield(player: &Player) -> u32 {
+/// Read pre-harvest state, before any crops are removed. Shared by
+/// C106 じゃがいも収穫者 and B132 地主 (`vegetable_taken_from_field`).
+pub fn vegetable_yield(player: &Player) -> u32 {
     player
         .farm
         .iter()

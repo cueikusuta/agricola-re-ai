@@ -387,6 +387,9 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::AfterOccupationGain { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::HarvestFieldGain { .. } => EventKind::Harvest,
+                crate::cards::CardEffect::HarvestFieldGainPointsIfFarmyardFull { .. } => {
+                    EventKind::Harvest
+                }
                 crate::cards::CardEffect::AfterHarvestGain { .. } => {
                     EventKind::AfterHarvestComplete
                 }
@@ -648,6 +651,8 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::StartRoundPlaceFoodOnNextRoundSpaces {
                             ..
                         } => 1,
+                        // B132: no good-amount to validate (points only)
+                        crate::cards::CardEffect::HarvestFieldGainPointsIfFarmyardFull { .. } => 1,
                         | crate::cards::CardEffect::HarvestFeedingGain { amount, .. } => *amount,
                                                 | crate::cards::CardEffect::HarvestFeedingOptionalExchange { options, .. } => {
                                                     options

@@ -103,6 +103,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // Harvest/baking — After phase
         CardEffect::AfterHarvestBakeGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGain { .. } => TriggerPhase::After,
+        CardEffect::HarvestFieldGainPointsIfFarmyardFull { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { .. } => TriggerPhase::After,
         CardEffect::AfterHarvestGain { .. } => TriggerPhase::After,
@@ -891,6 +892,14 @@ fn resolve_phase_scan(
                 CardEffect::HarvestFieldGain { rule, good, amount } => {
                     handle_harvest_field_gain(ctx, player, rule, good, *amount, trigger_data)?
                 }
+                CardEffect::HarvestFieldGainPointsIfFarmyardFull {
+                    points_per_vegetable,
+                } => handle_harvest_field_points_if_farmyard_full(
+                    ctx,
+                    player,
+                    *points_per_vegetable,
+                    trigger_data,
+                )?,
                 CardEffect::AfterHarvestGain { good, amount } => {
                     handle_after_harvest_gain(ctx, player, good, *amount)?
                 }
@@ -1339,6 +1348,9 @@ fn effect_condition_holds(
         }
         CardEffect::AfterHarvestBakeGain { .. } => trigger.site == EventKind::Bake && trigger.baked,
         CardEffect::HarvestFieldGain { .. } => trigger.site == EventKind::Harvest,
+        CardEffect::HarvestFieldGainPointsIfFarmyardFull { .. } => {
+            trigger.site == EventKind::Harvest
+        }
         // AfterHarvestGain/IfAtLeast are "at the end of each harvest" cards
         // (A145/C066): they fire from dispatch_after_harvest_complete at the
         // harvest tail, NOT from the field-phase trigger. On EventKind::Harvest
@@ -1848,6 +1860,14 @@ pub fn execute_chosen_triggers(
             CardEffect::HarvestFieldGain { rule, good, amount } => {
                 handle_harvest_field_gain(ctx, player, rule, good, *amount, trigger_data)?
             }
+            CardEffect::HarvestFieldGainPointsIfFarmyardFull {
+                points_per_vegetable,
+            } => handle_harvest_field_points_if_farmyard_full(
+                ctx,
+                player,
+                *points_per_vegetable,
+                trigger_data,
+            )?,
             CardEffect::AfterHarvestGain { good, amount } => {
                 handle_after_harvest_gain(ctx, player, good, *amount)?
             }
@@ -3694,6 +3714,34 @@ fn handle_harvest_field_gain(
         .checked_add(gain)
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// B132 地主 (Estate Master): at each harvest field phase, if every farmyard
+/// space is used, gain `points_per_vegetable` bonus points per vegetable
+/// harvested this field phase. The dispatcher runs before crops are removed,
+/// so each growing vegetable field equals one vegetable this phase yields.
+/// Points accumulate in `Player::bonus_points` (not `card_points` — printed
+/// points must keep matching played cards exactly).
+fn handle_harvest_field_points_if_farmyard_full(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    points_per_vegetable: u32,
+    _trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    if !crate::cards::farmyard_all_used(p) {
+        return Ok(EffectResult::Resolved);
+    }
+    let vegetables = crate::cards::vegetable_yield(p);
+    let gain = vegetables
+        .checked_mul(points_per_vegetable)
+        .ok_or("harvest bonus points overflow")?;
+    let next = p
+        .bonus_points
+        .checked_add(i32::try_from(gain).map_err(|_| "bonus points overflow")?)
+        .ok_or("bonus points overflow")?;
+    p.bonus_points = next;
     Ok(EffectResult::Resolved)
 }
 

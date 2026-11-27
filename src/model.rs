@@ -221,6 +221,17 @@ pub struct Player {
     pub played_cards: Vec<String>,
     #[serde(default)]
     pub card_points: i32,
+    /// Bonus points earned during the game by card effects that grant points
+    /// outside of card play (e.g. B132 地主's harvest-field bonus). Kept
+    /// separate from `card_points` because `card_points` must always equal the
+    /// sum of printed points of played cards (`CardState::validate_card_points`);
+    /// mid-game grants would break that invariant and the engine's incremental
+    /// validation. Counted at final scoring in `score.rs`.
+    /// Omitted from serialization while zero so LOG_VERSION=5 `state_hash`
+    /// values stay stable for pre-B132 games (like the empty-ledger rule for
+    /// `card_accumulations`, PR #327/#371).
+    #[serde(default, skip_serializing_if = "Player::bonus_points_is_zero")]
+    pub bonus_points: i32,
     #[serde(default)]
     pub pasture_capacity_bonus: u32,
     #[serde(default)]
@@ -272,6 +283,7 @@ impl Player {
             improvements: vec![],
             played_cards: vec![],
             card_points: 0,
+            bonus_points: 0,
             pasture_capacity_bonus: 0,
             free_fence_wood: 0,
             improvement_wood_discount: 0,
@@ -285,6 +297,14 @@ impl Player {
             field_goods_before_final_harvest: None,
         }
     }
+    /// Keep LOG_VERSION=5 `state_hash` stable for games where no card has
+    /// granted bonus points yet: `bonus_points` is omitted from
+    /// serialization while zero, so old fixtures and pre-B132 replays hash
+    /// identically once the field stays unused.
+    fn bonus_points_is_zero(p: &i32) -> bool {
+        *p == 0
+    }
+
     pub fn rooms(&self) -> usize {
         self.farm
             .iter()

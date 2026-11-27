@@ -363,6 +363,26 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
             ],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
+        // B132 地主 (Estate Master): cost 0; at every harvest field phase, if
+        // every farmyard space is used, gain 1 bonus point per vegetable
+        // harvested this field phase (agricola.cloudfree.jp ?p=3125).
+        // Eligible at 3+ players per the BGA wiki; no engine prerequisite is
+        // expressed on the printed card.
+        CardDefinition {
+            use_limit: None,
+            id: "B132".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::HarvestFieldGainPointsIfFarmyardFull {
+                points_per_vegetable: 1,
+            }],
+            // Merge integration (PR #471 R1): `post_play` became a required
+            // `CardDefinition` field on main; B132 地主 is an Occupation that
+            // stays in the owner's played area (it does not pass left), so the
+            // default PlayedArea preserves the reviewed semantics exactly.
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
     ]
 }
 
