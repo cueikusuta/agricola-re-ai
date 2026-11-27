@@ -31,6 +31,7 @@ fn d054_round_start_food(owner: usize, accumulations: &BTreeMap<Space, u32>) -> 
     let used = BTreeSet::new();
     let mut event_budget = 100;
     let mut card_uses = BTreeMap::new();
+    let mut card_uses_game = BTreeMap::new();
     let card_use_limits = BTreeMap::new();
     let mut pending = None;
     dispatch_start_round(
@@ -44,6 +45,7 @@ fn d054_round_start_food(owner: usize, accumulations: &BTreeMap<Space, u32>) -> 
         accumulations,
         &mut event_budget,
         &mut card_uses,
+        &mut card_uses_game,
         &card_use_limits,
         &mut pending,
         &[],

@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "card_id": "E120",
+  "cases": [
+    {
+      "id": "E120-alternating-placement",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "current_round": 1
+      },
+      "action": {
+        "trigger": "on_play"
+      },
+      "expected": {
+        "round_spaces": {
+          "2": { "wood": 1 },
+          "3": { "clay": 1 },
+          "4": { "wood": 1 },
+          "5": { "clay": 1 },
+          "6": { "wood": 1 },
+          "7": { "clay": 1 }
+        }
+      },
+      "notes": "On play in round 1, alternating wood/clay placed on rounds 2-7."
+    },
+    {
+      "id": "E120-collect-wood-rounds",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "round_spaces": {
+          "2": { "wood": 1 },
+          "4": { "wood": 1 },
+          "6": { "wood": 1 }
+        }
+      },
+      "action": {
+        "trigger": "round_start",
+        "round": 2
+      },
+      "expected": {
+        "gains": {
+          "wood": 1
+        }
+      },
+      "notes": "At round 2 start, collect 1 wood. Same for rounds 4 and 6."
+    },
+    {
+      "id": "E120-collect-clay-rounds",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "round_spaces": {
+          "3": { "clay": 1 },
+          "5": { "clay": 1 },
+          "7": { "clay": 1 }
+        }
+      },
+      "action": {
+        "trigger": "round_start",
+        "round": 3
+      },
+      "expected": {
+        "gains": {
+          "clay": 1
+        }
+      },
+      "notes": "At round 3 start, collect 1 clay. Same for rounds 5 and 7."
+    },
+    {
+      "id": "E120-late-play-fewer-rounds",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "current_round": 12
+      },
+      "action": {
+        "trigger": "on_play"
+      },
+      "expected": {
+        "round_spaces": {
+          "13": { "wood": 1 },
+          "14": { "clay": 1 }
+        }
+      },
+      "notes": "Played in round 12, only rounds 13 and 14 available -> 1 wood on 13, 1 clay on 14."
+    }
+  ]
+}

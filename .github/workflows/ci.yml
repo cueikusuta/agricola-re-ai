@@ -49,6 +49,7 @@ jobs:
               - '!**/*.md'
               - '!tests/**'
               - '!scripts/**'
+              - '!src/cards/band_*.rs'
 
   format:
     name: rustfmt

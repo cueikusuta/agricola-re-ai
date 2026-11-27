@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "card_id": "C110",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "自家醸造師",
+    "name_en": "Home Brewer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2979",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_feeding",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "grain",
+                    "amount": 1
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "food",
+                    "amount": 3
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "grain",
+                    "amount": 1
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "points",
+                    "amount": 1
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.trigger: 「各収穫の畑フェイズの後」を表す trigger は語彙外（doc で after_field_phase は使用禁止、C054 と同一状況）。C054 の先例に従い harvest_feeding で近似し、phase 確定まで未解決"
+    ],
+    "test_case_ids": [
+      "C110-normal",
+      "C110-edge"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "After the field phase of each harvest, you can use this card to turn exactly 1 grain into your choice of 3 food or 1 bonus point."
+  }
+}
