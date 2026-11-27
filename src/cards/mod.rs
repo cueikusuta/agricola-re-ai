@@ -666,6 +666,18 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// B071 収穫小屋 (Harvest House): on play, when the number of completed
+    /// harvests equals the number of occupations the owner has played, gain
+    /// `amount` of `good`. The printed card grants 1 food + 1 grain + 1
+    /// vegetable, so the definition carries three effects of this variant
+    /// (one per good). The condition is judged inside the handler (E111/C111
+    /// pattern): the completed-harvest count needs `HARVEST_ROUNDS` and the
+    /// current round, and the occupation count needs a card-definition lookup
+    /// (`occupation_count`, which never counts this minor improvement itself).
+    OnPlayGainIfHarvestsEqualOccupations {
+        good: Good,
+        amount: u32,
+    },
 }
 
 /// One printed option of a harvest-feeding owner-chosen exchange.
@@ -724,6 +736,9 @@ impl CardEffect {
                 "on_play_gain_per_improvement_played"
             }
             CardEffect::OnPlayGainPerCount { .. } => "on_play_gain_per_count",
+            CardEffect::OnPlayGainIfHarvestsEqualOccupations { .. } => {
+                "on_play_gain_if_harvests_equal_occupations"
+            }
             CardEffect::AfterAnyWorkerGain { .. } => "after_any_worker_gain",
             CardEffect::OnPlayChoiceGain { .. } => "on_play_choice_gain",
             CardEffect::OnPlayAddStoneToEmptyFields { .. } => "on_play_add_stone_to_empty_fields",
@@ -1159,6 +1174,7 @@ impl CardSet {
                         | CardEffect::AfterClayConstructionGain { amount, .. }
                         | CardEffect::AfterHarvestBakeGain { amount }
                         | CardEffect::OnPlayGainPerCount { amount, .. }
+                        | CardEffect::OnPlayGainIfHarvestsEqualOccupations { amount, .. }
                         | CardEffect::AfterImprovementPlayedGain { amount, .. }
                         | CardEffect::OnPlayGainAnimal { amount, .. }
                         | CardEffect::AfterWorkerGainAnimal { amount, .. } => *amount,
@@ -1694,6 +1710,18 @@ pub(crate) fn occupation_count(set: &CardSet, player: &Player) -> usize {
                 .is_some_and(|card| card.kind == CardKind::Occupation)
         })
         .count()
+}
+
+/// Count the harvests completed before `round`: the number of `HARVEST_ROUNDS`
+/// entries strictly earlier than the current round (e.g. in round 8 the
+/// completed harvests are rounds 4 and 7, so the count is 2). B071 収穫小屋's
+/// condition reads this instead of `round - 1`, because harvests do not
+/// happen every round.
+pub(crate) fn completed_harvest_count(round: u8) -> u32 {
+    crate::model::HARVEST_ROUNDS
+        .iter()
+        .filter(|&&harvest_round| harvest_round < round)
+        .count() as u32
 }
 
 /// Count clay rooms (rooms in clay or stone house).

@@ -674,6 +674,15 @@ fn card_priority(
                     };
                     card_good_value(*good) * i64::from(*amount) * avg_count
                 }
+                // B071 収穫小屋: a one-time conditional bundle (food / grain /
+                // vegetable). The measured-delta loop above cannot see it —
+                // the condition needs the current round and the legacy
+                // `cards::play` path (no round parameter) never fires this
+                // variant — so estimate the bundle once at half confidence
+                // (harvests == occupations is roughly a coin flip mid-game).
+                CardEffect::OnPlayGainIfHarvestsEqualOccupations { good, amount, .. } => {
+                    card_good_value(*good) * i64::from(*amount) / 2
+                }
                 CardEffect::Passive { .. } => horizon * 5,
                                 CardEffect::EndGameBonus { .. } => 12,
                                 CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,

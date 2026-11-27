@@ -339,6 +339,7 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainIfRoomCount { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
                 | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                | crate::cards::CardEffect::OnPlayGainIfHarvestsEqualOccupations { .. }
                 // B-deck on-play chapter 1
                 | crate::cards::CardEffect::OnPlayBuildPasture { .. }
                 | crate::cards::CardEffect::OnPlayDrawPlayOrPassOccupation { .. }
@@ -571,9 +572,11 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestGain { amount, .. }
-                        | crate::cards::CardEffect::AfterHarvestGainIfAtLeast { amount, .. } => {
-                            *amount
-                        }
+                        | crate::cards::CardEffect::AfterHarvestGainIfAtLeast { amount, .. }
+                        | crate::cards::CardEffect::OnPlayGainIfHarvestsEqualOccupations {
+                            amount,
+                            ..
+                        } => *amount,
                         crate::cards::CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,

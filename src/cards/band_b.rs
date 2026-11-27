@@ -383,6 +383,38 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
             // default PlayedArea preserves the reviewed semantics exactly.
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
+        // B071 収穫小屋 (Harvest House): minor improvement, cost wood 1 +
+        // clay 1 + reed 1, 2 printed points. On play, when the number of
+        // completed harvests (HARVEST_ROUNDS strictly before the current
+        // round) equals the number of occupations the owner has played, gain
+        // 1 food, 1 grain and 1 vegetable. The printed bundle is three
+        // gains, so the definition carries three
+        // OnPlayGainIfHarvestsEqualOccupations effects (one per good); the
+        // occupation count never counts this minor improvement itself.
+        // Eligible at all player counts (spec 2/3/4 = yes;
+        // agricola.cloudfree.jp ?p=3186, cross-checked against cardlist_en).
+        CardDefinition {
+            use_limit: None,
+            id: "B071".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1), (Good::Clay, 1), (Good::Reed, 1)],
+            points: 2,
+            effects: vec![
+                CardEffect::OnPlayGainIfHarvestsEqualOccupations {
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfHarvestsEqualOccupations {
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfHarvestsEqualOccupations {
+                    good: Good::Vegetable,
+                    amount: 1,
+                },
+            ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
     ]
 }
 
