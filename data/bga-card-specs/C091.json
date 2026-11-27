@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "C091",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "耕作の英雄",
+    "name_en": "Plow Hero"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2998",
+        "language": "ja",
+        "checked_on": "2026-11-22",
+        "page_version": null,
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-22",
+        "page_version": null,
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          },
+          "notes": "When the first player uses 'plow' or 'farmland' action, may gain 1 food"
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_round",
+      "duration": "per_round",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Once per round, the first player may gain 1 food when using plow or farmland action."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area for the game"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C091-first-player-food",
+      "C091-second-player-no-food",
+      "C091-optional-no-food",
+      "C091-optional-once-per-round"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-22",
+    "implementation_status": "not_started",
+    "notes": "Passive effect: first player may gain 1 food once per round when using plow/farmland. Stage 2 per classification (single site: space usage / cultivation)."
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "card_id": "C088",
+  "cases": [
+    {
+      "id": "C088-wood-room-discount",
+      "scope": "effect_only",
+      "setup": {
+        "card_in_play": "C088",
+        "wood": 4,
+        "reed": 0,
+        "rooms": 1
+      },
+      "action": {
+        "build_wood_room": true
+      },
+      "expected": {
+        "wood_delta": -2,
+        "rooms_delta": 1
+      },
+      "notes": "First wood room costs 2 wood (normally 4)"
+    },
+    {
+      "id": "C088-stable-discount",
+      "scope": "effect_only",
+      "setup": {
+        "card_in_play": "C088",
+        "wood": 3,
+        "stables": 2
+      },
+      "action": {
+        "build_stable": true
+      },
+      "expected": {
+        "wood_delta": -2,
+        "stables_delta": 1
+      },
+      "notes": "3rd stable costs 2 wood (normally 3)"
+    },
+    {
+      "id": "C088-fence-discount",
+      "scope": "effect_only",
+      "setup": {
+        "card_in_play": "C088",
+        "wood": 3,
+        "fences": 12
+      },
+      "action": {
+        "build_fence": true
+      },
+      "expected": {
+        "wood_delta": -0,
+        "fences_delta": 1
+      },
+      "notes": "13th fence is free (normally 1 wood)"
+    },
+    {
+      "id": "C088-combined-discounts",
+      "scope": "effect_only",
+      "setup": {
+        "card_in_play": "C088",
+        "wood": 10,
+        "rooms": 2,
+        "stables": 3,
+        "fences": 14
+      },
+      "action": {
+        "build_wood_room": true,
+        "build_stable": true,
+        "build_fence": true
+      },
+      "expected": {
+        "wood_delta": -5,
+        "rooms_delta": 1,
+        "stables_delta": 1,
+        "fences_delta": 1
+      },
+      "notes": "All three discounts apply simultaneously: room -2, 4th stable -1, 15th fence free"
+    }
+  ]
+}

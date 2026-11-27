@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "card_id": "C090",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "畑番",
+    "name_en": "Field Watchman"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2999",
+        "language": "ja",
+        "checked_on": "2026-11-22",
+        "page_version": null,
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-22",
+        "page_version": null,
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wheat",
+            "amount": 1
+          },
+          "notes": "Each time the 'wheat seeds' action space is used, gain 1 wheat"
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "When 'wheat seeds' action space is used, may gain 1 wheat. This is optional."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area for the game"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C090-wheat-seeds-reward",
+      "C090-optionality"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-22",
+    "implementation_status": "not_started",
+    "notes": "Passive effect: each use of 'wheat seeds' action may gain 1 wheat. Stage 2 per classification (single site: space usage / cultivation)."
+  }
+}

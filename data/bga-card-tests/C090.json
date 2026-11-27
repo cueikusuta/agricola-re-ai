@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "C090",
+  "cases": [
+    {
+      "id": "C090-wheat-seeds-reward",
+      "scope": "effect_only",
+      "setup": {
+        "card_in_play": "C090",
+        "wheat_seeds_used": 0,
+        "food": 0
+      },
+      "action": {
+        "use_wheat_seeds": true
+      },
+      "expected": {
+        "wheat_seeds_used": 1,
+        "food_delta": 1
+      },
+      "notes": "Using wheat seeds action gains 1 food (wheat)"
+    },
+    {
+      "id": "C090-optionality",
+      "scope": "effect_only",
+      "setup": {
+        "card_in_play": "C090",
+        "wheat_seeds_used": 0,
+        "food": 0
+      },
+      "action": {
+        "use_wheat_seeds": true
+      },
+      "expected": {
+        "food_delta": 0
+      },
+      "notes": "May gain 0 food - effect is optional (optional: true in spec)"
+    }
+  ]
+}

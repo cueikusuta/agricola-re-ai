@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "card_id": "C104",
+  "cases": [
+    {
+      "id": "C104-first-use-six-goods",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C104"
+        ],
+        "space": "collector",
+        "times_used": 0,
+        "begging_markers": 0
+      },
+      "action": {
+        "use_space": "collector"
+      },
+      "expected": {
+        "begging_markers_delta": 1,
+        "goods_gained": 6,
+        "goods_distinct_types": true
+      },
+      "notes": "First use of the private space: 1 begging marker and 6 goods of mutually different types."
+    },
+    {
+      "id": "C104-second-use-seven-goods",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C104"
+        ],
+        "space": "collector",
+        "times_used": 1,
+        "begging_markers": 1
+      },
+      "action": {
+        "use_space": "collector"
+      },
+      "expected": {
+        "begging_markers_delta": 1,
+        "goods_gained": 7,
+        "goods_distinct_types": true
+      },
+      "notes": "Second use: the goods table steps up to 7."
+    },
+    {
+      "id": "C104-fourth-use-nine-goods",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C104"
+        ],
+        "space": "collector",
+        "times_used": 3,
+        "begging_markers": 3
+      },
+      "action": {
+        "use_space": "collector"
+      },
+      "expected": {
+        "begging_markers_delta": 1,
+        "goods_gained": 9,
+        "goods_distinct_types": true
+      },
+      "notes": "Fourth use: the top of the source's table, 9 distinct goods."
+    },
+    {
+      "id": "C104-fifth-use-unresolved",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C104"
+        ],
+        "space": "collector",
+        "times_used": 4,
+        "begging_markers": 4
+      },
+      "action": {
+        "use_space": "collector"
+      },
+      "expected": {
+        "begging_markers_delta": 1,
+        "goods_gained": null
+      },
+      "notes": "Neither source states the 5th-and-later behavior; the provisional MQ-13 default (begging marker only, no goods) is recorded in review.unresolved_fields and is not an official ruling."
+    },
+    {
+      "id": "C104-owner-only-space",
+      "scope": "legal_play",
+      "setup": {
+        "occupation_in_play": [
+          "C104"
+        ],
+        "space": "collector",
+        "times_used": 0,
+        "acting_player": "other"
+      },
+      "action": {
+        "use_space": "collector"
+      },
+      "expected": {
+        "legal": false
+      },
+      "notes": "The space belongs to the card's owner only; other players cannot use it."
+    }
+  ]
+}

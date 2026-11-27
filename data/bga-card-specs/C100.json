@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "card_id": "C100",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "使用人頭",
+    "name_en": "Butler"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2989",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; effect rephrased in own words, no verbatim text kept"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list row used to cross-check the card id, name and effect summary"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "end_scoring",
+      "conditions": [
+        {
+          "predicate": "raw_text",
+          "params": {
+            "text": "このカードをラウンド11以前に出していること（JA ページは得点条件として明記）"
+          }
+        },
+        {
+          "predicate": "rooms_exceed_people",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": 4
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "end_of_game",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Both sources state the bonus as conditional on two things: the card was played in round 11 or before, and at scoring the owner has more rooms than family members. Equal room and people counts do not qualify (the comparison is strict)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions[0]: 'played in round 11 or before' has no established predicate (vocabulary round_number supports n/min only; D099 uses max for an on-play condition; B014/B023/B038 round_lte is flagged as needing formalization); raw_text keeps the source's summary of the play window"
+    ],
+    "test_case_ids": [
+      "C100-early-play-rooms-exceed",
+      "C100-late-play-no-bonus",
+      "C100-rooms-not-exceed",
+      "C100-rooms-equal-people"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Printed points: 0. Ban: none. Own-word summary of the third-party wiki effect: if this card was played in round 11 or before, then at scoring the owner gains 4 bonus points when their farm has more rooms than family members. Classification (docs/all-cards-classification-final.md, PR #377 source): stage 3, rooms (room count compared with people count), ROOM. Sources: BGA wiki JA page and English list row, cross-checked; not official Lookout verification."
+  }
+}

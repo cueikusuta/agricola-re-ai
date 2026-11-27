@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "card_id": "C099",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "ガーデンデザイナー",
+    "name_en": "Garden Designer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2990",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; effect rephrased in own words, no verbatim text kept"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list row used to cross-check the card id, name and effect summary"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "end_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_food_on_empty_fields",
+            "any_amount": true,
+            "notes": "at the start of scoring the owner may put any number of food tokens onto the empty fields of their own farm; the split across fields is the owner's choice"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "end_of_game",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner"
+    },
+    {
+      "trigger": "end_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": {
+              "op": "custom",
+              "args": [
+                "per_field_threshold_table",
+                "food_in_field",
+                {
+                  "1": 1,
+                  "4": 2,
+                  "7": 3
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "end_of_game",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Each of the owner's fields that ends up holding exactly 1/4/7 food yields 1/2/3 bonus points; a field holding any other number of food yields nothing."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].params.kind 'place_food_on_empty_fields': no vocabulary kind covers putting an arbitrary amount of food onto empty fields (place_food_on_card targets the card itself; add_good_to_empty_fields / add_good_to_single_good_fields fix the amount and kind)",
+      "effects[1].steps[0].params.points: per-field threshold scoring (a field with exactly 1/4/7 food yields 1/2/3 points) has no expression op; the threshold_table op reads a single count source and cannot score each field separately"
+    ],
+    "test_case_ids": [
+      "C099-place-one-food",
+      "C099-place-four-food",
+      "C099-place-seven-food",
+      "C099-decline-placement",
+      "C099-non-threshold-amount"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Printed points: 0. Ban: strong. Own-word summary of the third-party wiki effect: at the start of scoring the owner may place any amount of food onto empty fields of their farm, and each field ending up with exactly 1/4/7 food scores 1/2/3 bonus points. Classification (docs/all-cards-classification-final.md, PR #377 source): stage outside, single site: end-of-game scoring / food placement decision (already gated by PR #356 G3), DEF. Sources: BGA wiki JA page and English list row, cross-checked; not official Lookout verification."
+  }
+}

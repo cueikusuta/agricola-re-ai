@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "card_id": "C103",
+  "cases": [
+    {
+      "id": "C103-cattle-for-vegetable",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C103"
+        ],
+        "phase": "round_start",
+        "cattle": 1,
+        "vegetable": 0,
+        "exchanges_this_round": 0
+      },
+      "action": {
+        "use_card": "C103",
+        "exchange": "cattle_to_vegetable"
+      },
+      "expected": {
+        "cattle_delta": -1,
+        "vegetable_delta": 1
+      },
+      "notes": "Round start: 1 cattle can be turned into 1 vegetable."
+    },
+    {
+      "id": "C103-sheep-for-vegetable",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C103"
+        ],
+        "phase": "round_start",
+        "sheep": 2,
+        "vegetable": 0,
+        "exchanges_this_round": 0
+      },
+      "action": {
+        "use_card": "C103",
+        "exchange": "sheep_to_vegetable"
+      },
+      "expected": {
+        "sheep_delta": -2,
+        "vegetable_delta": 1
+      },
+      "notes": "The opposite animal direction: 2 sheep buy 1 vegetable."
+    },
+    {
+      "id": "C103-grain-for-food",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C103"
+        ],
+        "phase": "round_start",
+        "grain": 1,
+        "food": 0,
+        "exchanges_this_round": 0
+      },
+      "action": {
+        "use_card": "C103",
+        "exchange": "grain_to_food"
+      },
+      "expected": {
+        "grain_delta": -1,
+        "food_delta": 2
+      },
+      "notes": "1 grain can be turned into 2 food."
+    },
+    {
+      "id": "C103-decline-exchange",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C103"
+        ],
+        "phase": "round_start",
+        "cattle": 1,
+        "exchanges_this_round": 0
+      },
+      "action": {
+        "use_card": "C103",
+        "exchange": null
+      },
+      "expected": {
+        "cattle_delta": 0,
+        "vegetable_delta": 0
+      },
+      "notes": "The exchange is optional; declining changes nothing."
+    },
+    {
+      "id": "C103-once-per-round",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C103"
+        ],
+        "phase": "round_start",
+        "cattle": 2,
+        "vegetable": 0,
+        "exchanges_this_round": 1
+      },
+      "action": {
+        "use_card": "C103",
+        "exchange": "cattle_to_vegetable"
+      },
+      "expected": {
+        "cattle_delta": 0,
+        "vegetable_delta": 0
+      },
+      "notes": "Only one exchange is allowed per round start; a second attempt in the same round is blocked."
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "card_id": "C089",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "厩の親方",
+    "name_en": "Stable Master"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3000",
+        "language": "ja",
+        "checked_on": "2026-11-22",
+        "page_version": null,
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-22",
+        "page_version": null,
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "owner",
+          "params": {
+            "amount": 1,
+            "wood_cost": 1
+          },
+          "notes": "On play, build exactly 1 stable for 1 wood"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Must pay 1 wood to build 1 stable immediately when this card is played"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "stable_count",
+          "params": { "min": 1 },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "modify_capacity",
+          "target": "owner",
+          "params": {
+            "scope": "single_unfenced_stable",
+            "animal": "any_one_type",
+            "animal_capacity": 3,
+            "any_type": false,
+            "ignore_stables": false
+          },
+          "notes": "Exactly 1 unfenced stable can hold up to 3 animals of 1 type"
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Permanent capacity increase: one unfenced stable holds 3 animals of a single type instead of the normal capacity. This is a continuous effect on stable capacity."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area for the game"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C089-on-play-stable",
+      "C089-capacity-bonus",
+      "C089-single-type-limit"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-22",
+    "implementation_status": "not_started",
+    "notes": "Two effects: (1) on_play build 1 stable for 1 wood, (2) passive - exactly 1 unfenced stable has capacity 3 for a single animal type. Stage 4 per classification (P3: on_play + constant capacity)."
+  }
+}

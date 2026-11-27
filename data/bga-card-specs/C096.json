@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "card_id": "C096",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "販売人",
+    "name_en": "Merchant"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2993",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; effect rephrased in own words, no verbatim text kept"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list row used to cross-check the card id, name and effect summary"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "major_or_minor_improvement"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "major_or_minor_improvement"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Immediately after each use of the Major or Minor Improvement board space, the owner may pay 1 food to take that same action a second time (the repeated action keeps its own normal costs)."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "minor_improvement"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "minor_improvement"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Immediately after each use of the Minor Improvement board space, the owner may pay 1 food to take that same action a second time (the repeated action keeps its own normal costs)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C096-major-or-minor-repeat",
+      "C096-minor-repeat",
+      "C096-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Printed points: 0. Ban: none. Own-word summary of the third-party wiki effect: right after taking the Major or Minor Improvement action, or the Minor Improvement action, the owner may immediately pay 1 food to take the same action once more. Space names follow the A095 grant_action vocabulary ('major_or_minor_improvement', 'minor_improvement'); sources name the two board actions explicitly. Sources state 'each time you take the action' without restricting it to the board spaces; card-granted variants of these actions are source-silent and not modeled here. Classification (docs/all-cards-classification-final.md, PR #377 source): stage outside, single site, same action re-executed after the improvement action (TR-SITE, DEC). Sources: BGA wiki JA page and English list row, cross-checked; not official Lookout verification."
+  }
+}

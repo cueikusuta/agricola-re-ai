@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "card_id": "C103",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "青果商",
+    "name_en": "Green Grocer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2986",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; effect rephrased in own words, no verbatim text kept"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list row used to cross-check the card id, name and effect summary"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "round_start",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "cattle",
+                    "amount": 1
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "vegetable",
+                    "amount": 1
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "vegetable",
+                    "amount": 1
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "cattle",
+                    "amount": 1
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "sheep",
+                    "amount": 2
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "vegetable",
+                    "amount": 1
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "vegetable",
+                    "amount": 1
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "sheep",
+                    "amount": 2
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "food",
+                    "amount": 2
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "grain",
+                    "amount": 1
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "grain",
+                    "amount": 1
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "food",
+                    "amount": 2
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_round",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "At the start of each round the owner may carry out exactly one of six exchanges once: cattle and vegetables 1:1 in either direction, 2 sheep against 1 vegetable or 1 vegetable against 2 sheep, and 2 food against 1 grain or 1 grain against 2 food. An option is only available when the owner holds the goods to give."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C103-cattle-for-vegetable",
+      "C103-sheep-for-vegetable",
+      "C103-grain-for-food",
+      "C103-decline-exchange",
+      "C103-once-per-round"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Printed points: 0. Ban: none. Own-word summary of the third-party wiki effect: at each round start the owner may pick exactly one of six exchanges (cattle 1 with vegetable 1 in either direction; 2 sheep with 1 vegetable in either direction; 2 food with 1 grain in either direction). Choice-of-exchanges encoding follows A142. Classification (docs/all-cards-classification-final.md, PR #377 source): stage outside, single site: round start / exchange (six options), TR-SITE. Sources: BGA wiki JA page and English list row, cross-checked; not official Lookout verification."
+  }
+}

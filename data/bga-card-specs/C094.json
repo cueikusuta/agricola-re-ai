@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "card_id": "C094",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "厩掃除人",
+    "name_en": "Stable Cleaner"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2995",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; effect rephrased in own words, no verbatim text kept"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list row used to cross-check the card id, name and effect summary"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "anytime",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "grant_anytime_build_stables_without_person",
+            "action": "build_stables",
+            "requires_person_placement": false,
+            "stable_cost": [
+              {
+                "good": "wood",
+                "amount": 1
+              },
+              {
+                "good": "food",
+                "amount": 1
+              }
+            ],
+            "notes": "the Build Stables action may be taken without occupying a person, and each stable built this way costs 1 wood plus 1 food"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "The owner may take the Build Stables action at any time without placing a person; stables built through this card cost 1 wood and 1 food each. The Japanese page frames it as the per-stable build cost becoming wood 1 plus food 1 when built this way."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: いつでも (at any time) exceeds the established trigger vocabulary; execution window, chaining, cancellation and replay hashing are undefined (same class as C069/C018/A071)",
+      "effects[0].steps[0].params: taking the Build Stables action without a person placement, and the per-stable wood 1 + food 1 cost, are outside the established operations (build_stable_alternate_cost covers a single substitute good once per build)"
+    ],
+    "test_case_ids": [
+      "C094-anytime-build-one-stable",
+      "C094-two-stables-cost",
+      "C094-no-person-placed"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Printed points: 0. Ban: none. Own-word summary of the third-party wiki effect: at any time the owner may perform the Build Stables action without placing a person, and each stable built that way costs 1 wood and 1 food. Classification (docs/all-cards-classification-final.md, PR #377 source): stage outside, single site, anytime stable building (TR-SITE, DEF). Sources: BGA wiki JA page and English list row, cross-checked; not official Lookout verification."
+  }
+}
